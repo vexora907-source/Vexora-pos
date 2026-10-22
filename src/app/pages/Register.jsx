@@ -20,6 +20,16 @@ export default function Register() {
       email: String(form.get('email')).trim(),
       phone: String(form.get('phone')).trim(),
       address: String(form.get('address')).trim(),
+      dianNit: String(form.get('dianNit')).trim(),
+      dianVerificationDigit: String(form.get('dianVerificationDigit')).trim(),
+      dianLegalName: String(form.get('dianLegalName')).trim(),
+      dianAddress: String(form.get('dianAddress')).trim(),
+      dianCityCode: String(form.get('dianCityCode')).trim(),
+      dianCityName: String(form.get('dianCityName')).trim(),
+      dianDepartmentCode: String(form.get('dianDepartmentCode')).trim(),
+      dianDepartmentName: String(form.get('dianDepartmentName')).trim(),
+      dianEmail: String(form.get('dianEmail')).trim(),
+      dianTaxRegime: String(form.get('dianTaxRegime')).trim(),
     }
 
     const normalizedEmail = normalizeEmail(business.email)
@@ -70,6 +80,21 @@ export default function Register() {
             <label className="block text-sm font-semibold">Nombre del negocio<input name="business" required defaultValue={tenant.business?.name ?? ''} placeholder="Ej. Papel Color" className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3.5 outline-none transition focus:border-vexora-500 focus:ring-4 focus:ring-vexora-100" /></label>
             <label className="block text-sm font-semibold">Teléfono del negocio <span className="font-normal text-zinc-400">(opcional)</span><input name="phone" type="tel" defaultValue={tenant.business?.phone ?? ''} placeholder="300 123 4567" className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3.5 outline-none transition focus:border-vexora-500 focus:ring-4 focus:ring-vexora-100" /></label>
             <label className="block text-sm font-semibold">Dirección del negocio <span className="font-normal text-zinc-400">(opcional)</span><input name="address" maxLength={200} defaultValue={tenant.business?.address ?? ''} placeholder="Dirección y ciudad" className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3.5 outline-none transition focus:border-vexora-500 focus:ring-4 focus:ring-vexora-100" /></label>
+            <details className="rounded-xl border border-zinc-200 p-4">
+              <summary className="cursor-pointer text-sm font-bold">Datos fiscales del negocio (opcional, puedes completarlos después)</summary>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm font-semibold">NIT sin dígito de verificación<input name="dianNit" inputMode="numeric" pattern="[0-9]{9,10}" maxLength={10} defaultValue={tenant.dian?.nit ?? ''} placeholder="900123456" className="mt-2 w-full rounded-lg border border-zinc-200 p-3 font-normal" /></label>
+                <label className="block text-sm font-semibold">Dígito de verificación<input name="dianVerificationDigit" inputMode="numeric" pattern="[0-9]" maxLength={1} defaultValue={tenant.dian?.verificationDigit ?? ''} placeholder="5" className="mt-2 w-full rounded-lg border border-zinc-200 p-3 font-normal" /></label>
+                <label className="block text-sm font-semibold sm:col-span-2">Razón social legal<input name="dianLegalName" maxLength={160} defaultValue={tenant.dian?.legalName ?? ''} placeholder="Como aparece en el RUT" className="mt-2 w-full rounded-lg border border-zinc-200 p-3 font-normal" /></label>
+                <label className="block text-sm font-semibold sm:col-span-2">Dirección fiscal<input name="dianAddress" maxLength={200} defaultValue={tenant.dian?.address ?? ''} className="mt-2 w-full rounded-lg border border-zinc-200 p-3 font-normal" /></label>
+                <label className="block text-sm font-semibold">Código DIAN de ciudad<input name="dianCityCode" maxLength={10} defaultValue={tenant.dian?.cityCode ?? ''} className="mt-2 w-full rounded-lg border border-zinc-200 p-3 font-normal" /></label>
+                <label className="block text-sm font-semibold">Ciudad<input name="dianCityName" maxLength={100} defaultValue={tenant.dian?.cityName ?? ''} className="mt-2 w-full rounded-lg border border-zinc-200 p-3 font-normal" /></label>
+                <label className="block text-sm font-semibold">Código DIAN de departamento<input name="dianDepartmentCode" maxLength={10} defaultValue={tenant.dian?.departmentCode ?? ''} className="mt-2 w-full rounded-lg border border-zinc-200 p-3 font-normal" /></label>
+                <label className="block text-sm font-semibold">Departamento<input name="dianDepartmentName" maxLength={100} defaultValue={tenant.dian?.departmentName ?? ''} className="mt-2 w-full rounded-lg border border-zinc-200 p-3 font-normal" /></label>
+                <label className="block text-sm font-semibold">Correo para facturas DIAN<input name="dianEmail" type="email" maxLength={254} defaultValue={tenant.dian?.email ?? ''} className="mt-2 w-full rounded-lg border border-zinc-200 p-3 font-normal" /></label>
+                <label className="block text-sm font-semibold">Régimen de IVA<select name="dianTaxRegime" defaultValue={tenant.dian?.taxRegime ?? ''} className="mt-2 w-full rounded-lg border border-zinc-200 bg-white p-3 font-normal"><option value="">Seleccionar después</option><option value="RESPONSABLE_IVA">Responsable de IVA</option><option value="NO_RESPONSABLE_IVA">No responsable de IVA</option></select></label>
+              </div>
+            </details>
             <label className="block text-sm font-semibold">Tu nombre<input name="owner" required defaultValue={tenant.business?.owner ?? ''} placeholder="Nombre de quien administra" className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3.5 outline-none transition focus:border-vexora-500 focus:ring-4 focus:ring-vexora-100" /></label>
             <label className="block text-sm font-semibold">Correo electrónico<input name="email" required type="email" defaultValue={tenant.business?.email ?? ''} placeholder="tu@negocio.com" className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3.5 outline-none transition focus:border-vexora-500 focus:ring-4 focus:ring-vexora-100" /></label>
             {API_URL && <label className="block text-sm font-semibold">Contraseña<input name="password" required type="password" minLength={10} maxLength={72} autoComplete="new-password" placeholder="Al menos 10 caracteres" className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3.5 outline-none transition focus:border-vexora-500 focus:ring-4 focus:ring-vexora-100" /></label>}

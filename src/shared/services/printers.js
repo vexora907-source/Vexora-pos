@@ -174,6 +174,11 @@ async function printWebUsb(ticket, target, requestDevice) {
 }
 
 async function printUsb(ticket, target, requestDevice = false) {
+  if (isFirefoxDesktop()) {
+    if (await imprimirPosFirefox(target, ticket)) return
+    printUniversalTicket(ticket, target)
+    return
+  }
   if (typeof navigator.usb?.requestDevice === 'function') {
     await printWebUsb(ticket, target, requestDevice)
     return
@@ -182,8 +187,11 @@ async function printUsb(ticket, target, requestDevice = false) {
     await printWebSerial(ticket, target, requestDevice)
     return
   }
-  if (await imprimirPosFirefox(target, ticket)) return
   printUniversalTicket(ticket, target)
+}
+
+export function isFirefoxDesktop(userAgent = globalThis.navigator?.userAgent ?? '') {
+  return /Firefox\//.test(userAgent)
 }
 
 export async function getPrinterConfig(gremio) {

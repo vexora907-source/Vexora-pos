@@ -32,6 +32,16 @@ export default function OnboardingDIAN() {
           gremios: tenant.gremios,
           planId: 'INICIO',
           dianEnabled: false,
+          dianNit: draft.dianNit,
+          dianVerificationDigit: draft.dianVerificationDigit,
+          dianLegalName: draft.dianLegalName,
+          dianAddress: draft.dianAddress,
+          dianCityCode: draft.dianCityCode,
+          dianCityName: draft.dianCityName,
+          dianDepartmentCode: draft.dianDepartmentCode,
+          dianDepartmentName: draft.dianDepartmentName,
+          dianEmail: draft.dianEmail,
+          dianTaxRegime: draft.dianTaxRegime,
         })
         saveTenant({
           business: {

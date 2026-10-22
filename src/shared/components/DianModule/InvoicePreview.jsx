@@ -12,7 +12,7 @@ function getIssuedInvoice(response) {
 }
 
 function getVerificationUrl(issued) {
-  return issued.qrUrl ?? issued.qr_url ?? issued.verificationUrl ?? issued.verification_url ?? ''
+  return issued.qrUrl ?? issued.qr_url ?? issued.qrcode ?? issued.verificationUrl ?? issued.verification_url ?? ''
 }
 
 export function InvoicePreview({ invoice, dian, business, gremio, canPrintThermalInvoice = false, onClose = () => {}, onIssued = () => {} }) {
@@ -48,21 +48,22 @@ export function InvoicePreview({ invoice, dian, business, gremio, canPrintTherma
   }, [canPrintThermalInvoice, gremio])
 
   useEffect(() => {
-    if (dian.status !== 'active') return undefined
+    if (String(dian.status).toLowerCase() !== 'active') return undefined
     let cancelled = false
     setSending(true)
     submitDianInvoice({
       nit: dian.nit,
       legalName: dian.legalName,
       prefix: dian.prefix,
+      gremio,
       customer: invoice.customer,
       items: invoice.items,
       paymentMethod: invoice.paymentMethod,
-    }).then((response) => {
+    }, gremio).then((response) => {
       if (cancelled) return
       const issued = getIssuedInvoice(response)
-      const status = String(issued.status ?? issued.estado ?? '').toLowerCase()
-      if (response?.success === false || issued.success === false || ['rejected', 'rechazada', 'failed', 'error', 'invalid'].includes(status)) {
+      const status = String(issued.dian_status ?? issued.status ?? issued.estado ?? '').toLowerCase()
+      if (response?.success === false || issued.success === false || ['rejected', 'rechazada', 'failed', 'error', 'invalid'].includes(status) || (issued.dian_status && status !== 'accepted')) {
         throw new Error(issued.message ?? issued.mensaje ?? 'El proveedor no aceptó la factura.')
       }
       if (!issued.cufe && !issued.CUFE) {
@@ -79,7 +80,7 @@ export function InvoicePreview({ invoice, dian, business, gremio, canPrintTherma
       if (!cancelled) setSending(false)
     })
     return () => { cancelled = true }
-  }, [dian, invoice.items, invoice.paymentMethod])
+  }, [dian, gremio, invoice.customer, invoice.items, invoice.paymentMethod])
 
   if (printing && result) {
     const details = businessConfig ?? {}

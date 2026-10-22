@@ -4,6 +4,8 @@ import test from 'node:test'
 let responseToSend = { ok: true }
 let extensionAvailable = true
 let responseDelayMs = 0
+let userAgent = 'Mozilla/5.0 Firefox/128.0'
+let webUsbRequests = 0
 const listeners = new Set()
 
 globalThis.window = {
@@ -45,12 +47,26 @@ globalThis.window = {
   },
 }
 Object.defineProperty(globalThis, 'navigator', {
-  value: { userAgent: 'Mozilla/5.0 Firefox/128.0' },
+  value: {
+    get userAgent() { return userAgent },
+    usb: {
+      requestDevice: async () => {
+        webUsbRequests += 1
+        throw new Error('WebUSB request intercepted by the routing test')
+      },
+    },
+  },
   configurable: true,
 })
 
 const { imprimirPosFirefox } = await import('../src/shared/services/firefoxPrint.js')
-const { printReceipt } = await import('../src/shared/services/printers.js')
+const { isFirefoxDesktop, printReceipt } = await import('../src/shared/services/printers.js')
+
+test('identifies Firefox separately from Chrome and Edge', () => {
+  assert.equal(isFirefoxDesktop('Mozilla/5.0 Firefox/128.0'), true)
+  assert.equal(isFirefoxDesktop('Mozilla/5.0 Chrome/128.0 Safari/537.36'), false)
+  assert.equal(isFirefoxDesktop('Mozilla/5.0 Edg/128.0'), false)
+})
 
 test('sends Firefox print requests and resolves successful host responses', async () => {
   extensionAvailable = true
@@ -69,14 +85,29 @@ test('surfaces Native Messaging host errors to the caller', async () => {
 })
 
 test('routes Firefox receipt printing through the native extension', async () => {
+  userAgent = 'Mozilla/5.0 Firefox/128.0'
   extensionAvailable = true
   responseDelayMs = 0
   responseToSend = { ok: true }
+  webUsbRequests = 0
   await printReceipt('papeleria', { numero: 'T-2', productos: [], total: 1500 })
+  assert.equal(webUsbRequests, 0)
+  assert.equal(listeners.size, 0)
+})
+
+test('routes Chrome receipt printing through WebUSB, not the Firefox extension', async () => {
+  userAgent = 'Mozilla/5.0 Chrome/128.0 Safari/537.36'
+  webUsbRequests = 0
+  await assert.rejects(
+    printReceipt('papeleria', { numero: 'T-3', productos: [], total: 1500 }),
+    /WebUSB request intercepted by the routing test/,
+  )
+  assert.equal(webUsbRequests, 1)
   assert.equal(listeners.size, 0)
 })
 
 test('returns to system print when the Firefox extension is not loaded', async () => {
+  userAgent = 'Mozilla/5.0 Firefox/128.0'
   extensionAvailable = false
   responseDelayMs = 0
   assert.equal(await imprimirPosFirefox('caja', {}), false)
@@ -84,6 +115,7 @@ test('returns to system print when the Firefox extension is not loaded', async (
 })
 
 test('waits for a slow Native Host instead of opening a competing system print', async () => {
+  userAgent = 'Mozilla/5.0 Firefox/128.0'
   extensionAvailable = true
   responseDelayMs = 1300
   responseToSend = { ok: true }

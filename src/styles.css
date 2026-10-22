@@ -49,8 +49,8 @@ button {
     visibility: hidden !important;
   }
 
-  [role="dialog"],
-  [role="dialog"] * {
+  body:not(.printing-universal-ticket) [role="dialog"],
+  body:not(.printing-universal-ticket) [role="dialog"] * {
     visibility: visible !important;
   }
 

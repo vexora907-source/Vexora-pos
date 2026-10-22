@@ -14,7 +14,7 @@ export function TicketFacturaElectronica({ invoice, dian, business = {}, result,
   const [qrImage, setQrImage] = useState('')
   const [qrError, setQrError] = useState('')
   const issued = result?.invoice ?? result?.data?.invoice ?? result?.data ?? result ?? {}
-  const qrUrl = firstValue(issued, ['qrUrl', 'qr_url', 'verificationUrl', 'verification_url'])
+  const qrUrl = firstValue(issued, ['qrUrl', 'qr_url', 'qrcode', 'verificationUrl', 'verification_url'])
   const items = invoice.items ?? []
   const total = Number(firstValue(issued, ['total', 'amount'])) || items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0)
   const suppliedTax = firstValue(issued, ['totalIva', 'totalTax', 'taxTotal'])
@@ -58,8 +58,8 @@ export function TicketFacturaElectronica({ invoice, dian, business = {}, result,
     return () => window.clearTimeout(timer)
   }, [autoPrint, qrError, qrImage, qrUrl])
 
-  const number = firstValue(issued, ['number', 'invoiceNumber', 'consecutive', 'numero'])
-  const issueDate = firstValue(issued, ['issuedAt', 'issueDate', 'date', 'fecha'])
+  const number = firstValue(issued, ['full_number', 'number', 'invoiceNumber', 'consecutive', 'numero'])
+  const issueDate = firstValue(issued, ['issuedAt', 'issueDate', 'issue_date', 'date', 'fecha'])
   const issueTime = firstValue(issued, ['issueTime', 'time', 'hora'])
   const cufe = firstValue(issued, ['cufe', 'CUFE'])
   const resolution = firstValue(issued, ['resolution', 'resolucion']) || dian.resolution || dian.resolucion

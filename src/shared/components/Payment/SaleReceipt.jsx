@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Printer, X } from 'lucide-react'
 import { formatCOP } from '../../services/ticket.js'
-import { getRegisteredCustomers, saveRegisteredCustomer } from '../../services/customerService.js'
+import { getCustomers, getRegisteredCustomers, saveCustomer } from '../../services/customerService.js'
 import { getTicketCodeSettings } from '../../services/ticketCode.js'
 import { isDemoMode } from '../../services/tenantStorage.js'
 import { useTenantGremio } from '../../hooks/useTenantGremio.js'
@@ -18,6 +18,7 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
   const [customerId, setCustomerId] = useState('')
   const [addingCustomer, setAddingCustomer] = useState(false)
   const [customerError, setCustomerError] = useState('')
+  const [customersLoading, setCustomersLoading] = useState(false)
   const [customer, setCustomer] = useState({ type: 'final', name: 'Cliente Final' })
   const [showInvoice, setShowInvoice] = useState(false)
   const [showSampleInvoice, setShowSampleInvoice] = useState(false)
@@ -59,6 +60,23 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
     cashReceived,
     changeDue,
   }
+
+  useEffect(() => {
+    if (demo || !saleGremio) return undefined
+    let active = true
+    setCustomersLoading(true)
+    getCustomers(tenantKey, saleGremio)
+      .then((savedCustomers) => {
+        if (active) setCustomers(savedCustomers)
+      })
+      .catch((error) => {
+        if (active) setCustomerError(error instanceof Error ? error.message : 'No se pudieron cargar los clientes guardados.')
+      })
+      .finally(() => {
+        if (active) setCustomersLoading(false)
+      })
+    return () => { active = false }
+  }, [demo, saleGremio, tenantKey])
   const sampleDian = {
     enabled: true,
     status: 'sample',
@@ -123,22 +141,25 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
     void printSaleReceipt(false, false)
   }, [saleGremio, saleKey, ticketSettingsLoaded, ticketSettings.tipoCodigo])
 
-  function registerCustomer(event) {
+  async function registerCustomer(event) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
+    setCustomerError('')
     try {
-      const saved = saveRegisteredCustomer(tenantKey, {
+      const saved = await saveCustomer(tenantKey, saleGremio, {
         documentType: form.get('documentType'),
         documentNumber: form.get('documentNumber'),
-    cashReceived,
-    changeDue,
+        name: form.get('name'),
+        phone: form.get('phone'),
         email: form.get('email'),
       })
-      setCustomers((current) => [...current, saved])
+      setCustomers((current) => [
+        ...current.filter((item) => !(item.documentType === saved.documentType && item.documentNumber === saved.documentNumber)),
+        saved,
+      ])
       setCustomer(saved)
       setCustomerId(saved.id)
       setAddingCustomer(false)
-      setCustomerError('')
     } catch (error) {
       setCustomerError(error instanceof Error ? error.message : 'No se pudo registrar el cliente.')
     }
@@ -172,16 +193,17 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
           <label className="block text-xs font-bold text-slate-600">Cliente para el comprobante
             <select aria-label="Seleccionar cliente registrado" value={customerId} onChange={(event) => { const selected = customers.find((item) => item.id === event.target.value); setCustomerId(event.target.value); setCustomer(selected ?? { type: 'final', name: 'Cliente Final' }) }} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium"><option value="">Cliente Final</option>{customers.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.documentNumber}</option>)}</select>
           </label>
-          <p className="mt-2 text-[10px] text-zinc-400">{customers.length ? 'Clientes registrados en este navegador.' : 'No hay clientes registrados; se usará Cliente Final.'}</p>
+          <p className="mt-2 text-[10px] text-zinc-400">{customersLoading ? 'Cargando clientes guardados…' : customers.length ? demo ? 'Clientes guardados en este navegador demo.' : 'Clientes guardados en la base de datos de este gremio.' : 'No hay clientes registrados; se usará Cliente Final.'}</p>
+          {customerError && !addingCustomer && <p role="alert" className="mt-2 text-xs text-rose-700">{customerError}</p>}
           <button type="button" onClick={() => { setAddingCustomer((value) => !value); setCustomerError('') }} className="mt-2 text-xs font-bold text-vexora-700 hover:underline">{addingCustomer ? 'Cancelar registro' : '+ Registrar nuevo cliente'}</button>
-          {addingCustomer && <form onSubmit={registerCustomer} className="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
+          {addingCustomer && <form onSubmit={(event) => void registerCustomer(event)} className="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
             <label className="text-xs font-semibold">Tipo de documento<select name="documentType" className="mt-1 w-full rounded-lg border p-2"><option>CC</option><option>NIT</option><option>CE</option><option>Pasaporte</option></select></label>
             <label className="text-xs font-semibold">Documento<input name="documentNumber" required inputMode="numeric" className="mt-1 w-full rounded-lg border p-2" /></label>
             <label className="col-span-2 text-xs font-semibold">Nombre o razón social<input name="name" required className="mt-1 w-full rounded-lg border p-2" /></label>
             <label className="text-xs font-semibold">Teléfono<input name="phone" type="tel" className="mt-1 w-full rounded-lg border p-2" /></label>
             <label className="text-xs font-semibold">Correo<input name="email" type="email" className="mt-1 w-full rounded-lg border p-2" /></label>
             {customerError && <p role="alert" className="col-span-2 text-xs text-rose-700">{customerError}</p>}
-            <button className="col-span-2 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-bold text-white">Registrar y seleccionar cliente</button>
+            <button disabled={customersLoading} className="col-span-2 rounded-lg bg-zinc-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Guardar cliente y seleccionar</button>
           </form>}
         </section>
         {printerError && <p role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-xs text-rose-800 print:hidden">{printerError}</p>}

@@ -6,6 +6,9 @@ import { printPrinterTest } from '../../shared/services/printers.js'
 import { getAuthToken } from '../../shared/services/auth.js'
 import { appStorage, isDemoMode, readTenant } from '../../shared/services/tenantStorage.js'
 import { fetchLicenseSummary, updateAutoRenew } from '../../shared/services/licenseService.js'
+import { configureDian, getDianConfiguration, syncDianNumberings } from '../../shared/services/dianService.js'
+import { useTenantGremio } from '../../shared/hooks/useTenantGremio.js'
+import { DianConfig } from '../../shared/components/DianModule/DianConfig.jsx'
 import { TutorialGremio } from '../components/TutorialGremio.jsx'
 
 const STORAGE_KEY = 'vexora.business.config'
@@ -81,6 +84,7 @@ function PrinterSettingsCard({ title, description, printer, busy, onChange, onTe
 }
 
 export default function Configuration() {
+  const tenantContext = useTenantGremio()
   const [tab, setTab] = useState('negocio')
   const [config, setConfig] = useState(DEFAULT_CONFIG)
   const [busy, setBusy] = useState(false)
@@ -91,9 +95,17 @@ export default function Configuration() {
   const [gremio, setGremio] = useState(tenant.gremios?.[0] ?? '')
   const [printerTestBusy, setPrinterTestBusy] = useState('')
   const [showTutorial, setShowTutorial] = useState(false)
+  const [dianSettings, setDianSettings] = useState({ configured: false, accountId: '', environment: 'PRUEBAS' })
+  const [dianSettingsLoading, setDianSettingsLoading] = useState(false)
+  const [dianSettingsBusy, setDianSettingsBusy] = useState(false)
+  const [dianSyncBusy, setDianSyncBusy] = useState(false)
+  const [dianSettingsError, setDianSettingsError] = useState('')
+  const [dianSettingsMessage, setDianSettingsMessage] = useState('')
+  const [dianNumberings, setDianNumberings] = useState(null)
   const [licenseInfo, setLicenseInfo] = useState({ loading: false, summary: null, error: '', updatingAutoRenew: false })
   const currentPlan = String(licenseInfo.summary?.plan ?? tenant.plan ?? 'INICIO').trim().toUpperCase()
   const canConfigureDian = ['PRO', 'VEXORA', 'ENTERPRISE'].includes(currentPlan)
+  const canManageDian = ['OWNER', 'SUPER_ADMIN'].includes(tenant.user?.role)
 
   useEffect(() => {
     if (demo || !API_URL || !getAuthToken()) {
@@ -113,6 +125,67 @@ export default function Configuration() {
 
     return () => { active = false }
   }, [demo])
+
+  useEffect(() => {
+    if (demo || !API_URL || !getAuthToken() || !canConfigureDian || !canManageDian) return undefined
+    let active = true
+    setDianSettingsLoading(true)
+    setDianSettingsError('')
+    getDianConfiguration()
+      .then((result) => {
+        if (active) setDianSettings(result)
+      })
+      .catch((cause) => {
+        if (active) setDianSettingsError(cause instanceof Error ? cause.message : 'No se pudo cargar la conexión Dataico.')
+      })
+      .finally(() => {
+        if (active) setDianSettingsLoading(false)
+      })
+    return () => { active = false }
+  }, [demo, canConfigureDian, canManageDian])
+
+  async function saveDianSettings(values) {
+    setDianSettingsBusy(true)
+    setDianSettingsError('')
+    setDianSettingsMessage('')
+    try {
+      const result = await configureDian(values)
+      setDianSettings(result)
+      tenantContext.updateTenant({
+        dian: {
+          ...tenantContext.dian,
+          enabled: true,
+          status: 'ACTIVE',
+          nit: result.nit,
+          legalName: result.legalName,
+          prefix: result.prefix,
+        },
+      })
+      setDianSettingsMessage('Cuenta Dataico conectada a este negocio y disponible para sus gremios.')
+      return true
+    } catch (cause) {
+      setDianSettingsError(cause instanceof Error ? cause.message : 'No se pudo guardar la conexión Dataico.')
+      return false
+    } finally {
+      setDianSettingsBusy(false)
+    }
+  }
+
+  async function syncNumberings() {
+    setDianSyncBusy(true)
+    setDianSettingsError('')
+    setDianSettingsMessage('')
+    setDianNumberings(null)
+    try {
+      const response = await syncDianNumberings()
+      setDianNumberings(response)
+      setDianSettingsMessage('Dataico respondió a la solicitud de sincronización de resoluciones.')
+    } catch (cause) {
+      setDianSettingsError(cause instanceof Error ? cause.message : 'No se pudieron sincronizar las resoluciones.')
+    } finally {
+      setDianSyncBusy(false)
+    }
+  }
 
   function updatePrinter(target, field, value) {
     const key = target === 'caja' ? 'impresoraCaja' : 'impresoraCocina'
@@ -250,8 +323,8 @@ export default function Configuration() {
       </div>
       {canConfigureDian ? <section className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 sm:p-5">
         <div className="mb-4">
-          <h3 className="font-bold text-slate-900">Datos para facturación DIAN <span className="ml-1 rounded-full bg-violet-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-violet-800">Opcional</span></h3>
-          <p className="mt-1 text-sm text-slate-600">Completa los datos fiscales de tu negocio. Se guardarán con la configuración de este gremio.</p>
+          <h3 className="font-bold text-slate-900">Datos fiscales del gremio</h3>
+          <p className="mt-1 text-sm text-slate-600">Estos datos pertenecen a este gremio. La conexión Dataico y los datos del emisor se configuran una vez para el negocio.</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Input label="Razón social registrada en el RUT" value={config.negocio.razonSocial} onChange={(event) => update('negocio', 'razonSocial', event.target.value)} maxLength={160} />
@@ -260,11 +333,26 @@ export default function Configuration() {
           <Input label="Teléfono de contacto" value={config.negocio.telefono} onChange={(event) => update('negocio', 'telefono', event.target.value)} maxLength={40} />
           <Input label="Prefijo de factura" value={config.impuestos.prefijoFactura} onChange={(event) => update('impuestos', 'prefijoFactura', event.target.value.toUpperCase())} maxLength={5} />
         </div>
-        <p className="mt-4 text-xs leading-5 text-slate-600">Guardar estos datos no activa por sí solo la emisión electrónica. La integración DIAN y los requisitos de firma se configuran por separado.</p>
+        <p className="mt-4 text-xs leading-5 text-slate-600">La información fiscal del emisor usada al facturar se administra en la conexión Dataico compartida del negocio.</p>
       </section> : <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <h3 className="font-bold text-slate-800">Datos para facturación DIAN</h3>
         <p className="mt-1 text-sm text-slate-600">La captura de datos fiscales está disponible en los planes Pro y Vexora.</p>
       </section>}
+      {canConfigureDian && canManageDian && !demo && <div className="space-y-2">
+        {dianSettingsLoading && <p role="status" className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">Cargando conexión Dataico…</p>}
+        {!API_URL && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Configura VITE_API_URL y conecta este negocio con el backend para administrar Dataico.</p>}
+        <DianConfig
+          initial={dianSettings}
+          configured={Boolean(dianSettings.configured)}
+          busy={dianSettingsBusy}
+          syncing={dianSyncBusy}
+          error={dianSettingsError}
+          message={dianSettingsMessage}
+          numberingResponse={dianNumberings}
+          onSubmit={saveDianSettings}
+          onSync={syncNumberings}
+        />
+      </div>}
     </div>
     if (tab === 'ticket') return <section className="max-w-2xl space-y-4">
       <label className="block text-sm font-semibold">Código impreso en el ticket
