@@ -1,7 +1,7 @@
 import { isDemoMode } from './tenantStorage.js'
 
 const runtimeEnv = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : {}
-const PRODUCTION_API_URL = 'https://backend-vexora-pos.vercel.app'
+const PRODUCTION_API_URL = 'https://backend-vexora-pos-jkc6.vercel.app'
 export const API_URL = runtimeEnv.VITE_API_URL || (runtimeEnv.PROD ? PRODUCTION_API_URL : '')
 const TOKEN_KEY = 'vexora.accessToken'
 
