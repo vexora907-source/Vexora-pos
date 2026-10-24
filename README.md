@@ -11,20 +11,20 @@ cp .env.example .env
 npm run dev
 ```
 
-`VITE_API_URL` debe apuntar al origen del backend, por ejemplo
-`http://localhost:4000`. No agregues `/api`: las rutas de API ya incluyen ese
-prefijo. Si no está definida en producción, el frontend usa
-`https://backend-vexora-pos-jkc6.vercel.app`; un valor definido explícitamente
-siempre tiene prioridad.
+`VITE_API_URL` apunta por defecto al backend desplegado:
+`https://backend-vexora-pos-jkc6.vercel.app`. Para usar un backend local,
+cámbiala a `http://localhost:4000`. No agregues `/api`: las rutas ya incluyen
+ese prefijo. En producción, el mismo origen se usa como valor predeterminado
+cuando no hay una variable definida en Vercel.
 
 ## Despliegue en Vercel
 
 Configura las variables en **Project Settings → Environment Variables** del
 proyecto frontend y selecciona los entornos que uses:
 
-- `VITE_API_URL`: opcional si usas el dominio por defecto
-  `https://backend-vexora-pos-jkc6.vercel.app`. Si tienes otro dominio, configúralo
-  aquí. Usa solo el origen, sin `/api` ni una barra final.
+- `VITE_API_URL`: establece el origen del backend, por defecto
+  `https://backend-vexora-pos-jkc6.vercel.app`. Usa solo el origen, sin `/api`
+  ni una barra final.
 
 Guarda la variable y vuelve a desplegar el frontend, porque Vite la incorpora
 durante la compilación. No uses aquí `MONGODB_URI`, `JWT_SECRET` ni credenciales
