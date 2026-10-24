@@ -7,8 +7,8 @@ import { cacheProducts, readCachedProducts } from '../services/offlineDB.js'
 import { getCachedLicenseStatus } from '../services/licenseService.js'
 import { isNetworkUnavailable, pendingSalesCount, registerOfflineSale, reservePendingSales } from '../services/offlineSales.js'
 import { getProductIcon } from '../utils/productIcons.js'
+import { API_URL } from '../services/api.js'
 
-const API_URL = import.meta.env.VITE_API_URL
 const INVENTORY_UPDATED_EVENT = 'vexora:offline-queue-updated'
 
 function inventoryKey(gremio) {

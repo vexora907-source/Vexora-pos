@@ -13,16 +13,18 @@ npm run dev
 
 `VITE_API_URL` debe apuntar al origen del backend, por ejemplo
 `http://localhost:4000`. No agregues `/api`: las rutas de API ya incluyen ese
-prefijo.
+prefijo. Si no está definida en producción, el frontend usa
+`https://backend-vexora-pos.vercel.app`; un valor definido explícitamente
+siempre tiene prioridad.
 
 ## Despliegue en Vercel
 
 Configura las variables en **Project Settings → Environment Variables** del
 proyecto frontend y selecciona los entornos que uses:
 
-- `VITE_API_URL`: URL pública del backend desplegado, por ejemplo
-  `https://tu-backend.vercel.app`. Usa solo el origen, sin `/api` ni una barra
-  final.
+- `VITE_API_URL`: opcional si usas el dominio por defecto
+  `https://backend-vexora-pos.vercel.app`. Si tienes otro dominio, configúralo
+  aquí. Usa solo el origen, sin `/api` ni una barra final.
 
 Guarda la variable y vuelve a desplegar el frontend, porque Vite la incorpora
 durante la compilación. No uses aquí `MONGODB_URI`, `JWT_SECRET` ni credenciales
@@ -35,7 +37,7 @@ Si tienes dominios personalizados, permite también los que realmente usen tus
 usuarios.
 
 Puedes comprobar que el backend está disponible visitando
-`https://tu-backend.vercel.app/health`; debe responder `{"status":"ok"}`.
+`https://backend-vexora-pos.vercel.app/health`; debe responder `{"status":"ok"}`.
 Después, prueba el inicio de sesión o el registro desde el dominio del frontend.
 Si el navegador muestra un error CORS, confirma que `CORS_ORIGIN` coincide
 exactamente con el origen del sitio (protocolo y dominio, sin ruta) y que el

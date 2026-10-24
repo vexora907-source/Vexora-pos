@@ -30,10 +30,10 @@ import { getCachedLicenseStatus } from '../shared/services/licenseService.js'
 import { isNetworkUnavailable, canSellOffline } from '../shared/services/offlineSales.js'
 import { TutorialGremio } from '../app/components/TutorialGremio.jsx'
 import { hasSeenTutorial, tutorialStorageKey } from '../shared/services/tutorial.js'
+import { API_URL } from '../shared/services/api.js'
 
 const views = { papeleria: PapeleriaPOS, cerrajeria: CerrajeriaPOS, restaurante: RestaurantePOS, ferreteria: FerreteriaPOS, tienda: TiendaPOS, ropa: RopaPOS, comidas_rapidas: ComidasRapidasPOS }
 const gremioLabels = { papeleria: '📚 Papelería', cerrajeria: '🔑 Cerrajería', restaurante: '🍔 Restaurante', ferreteria: '🔧 Ferretería', tienda: '🛒 Tienda', ropa: '👕 Ropa', comidas_rapidas: '🍟 Comidas rápidas' }
-const API_URL = import.meta.env.VITE_API_URL
 
 function MultiGremioSwitcher({ gremios, activeGremio, onSelect }) {
   return (

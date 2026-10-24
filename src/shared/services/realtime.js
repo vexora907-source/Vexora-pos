@@ -1,8 +1,7 @@
 import { io } from 'socket.io-client'
 import { getAuthToken } from './auth.js'
 import { isDemoMode } from './tenantStorage.js'
-
-const API_URL = import.meta.env.VITE_API_URL
+import { API_URL } from './api.js'
 
 export function connectRealtimeSocket() {
   const token = getAuthToken()

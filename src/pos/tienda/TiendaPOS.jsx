@@ -11,6 +11,7 @@ import { useTenantGremio } from '../../shared/hooks/useTenantGremio.js'
 import { useInventory } from '../../shared/hooks/useInventory.js'
 import { assertCashRegisterOpen, recordCashSale } from '../../shared/services/cashRegister.js'
 import { appStorage, isDemoMode } from '../../shared/services/tenantStorage.js'
+import { API_URL } from '../../shared/services/api.js'
 
 const initialProducts = [
   { id: 'arroz', barcode: '7701000000103', name: 'Arroz por libra', category: 'Granos', price: 2400, quantity: 38, icon: '🍚', unit: 'lb' },
@@ -29,7 +30,6 @@ const suppliers = [
   { name: 'Aseo y Hogar Central', category: 'Aseo y cuidado personal', phone: '+573203456789', contact: 'Pedido mínimo: $150.000' },
 ]
 
-const API_URL = import.meta.env.VITE_API_URL
 const TOKEN_KEY = 'vexora.accessToken'
 
 function readCredits(key) {

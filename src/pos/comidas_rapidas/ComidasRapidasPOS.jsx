@@ -19,8 +19,8 @@ import { connectRealtimeSocket } from '../../shared/services/realtime.js'
 import { printConfiguredUsbTicket, printReceipt } from '../../shared/services/printers.js'
 import { appStorage, isDemoMode } from '../../shared/services/tenantStorage.js'
 import { formatCOP } from '../../shared/services/ticket.js'
+import { API_URL } from '../../shared/services/api.js'
 
-const API_URL = import.meta.env.VITE_API_URL
 const ingredients = [
   { id: 'bun', name: 'Pan de hamburguesa', category: 'Panadería', quantity: 60, price: 0, icon: '🍞', unit: 'unidad' },
   { id: 'beef', name: 'Carne de res (g)', category: 'Proteínas', quantity: 6000, price: 0, icon: '🥩', unit: 'g' },

@@ -12,8 +12,8 @@ import { assertCashRegisterOpen, recordCashSale } from '../../shared/services/ca
 import { getAuthToken } from '../../shared/services/auth.js'
 import { appStorage, isDemoMode } from '../../shared/services/tenantStorage.js'
 import { formatCOP } from '../../shared/services/ticket.js'
+import { API_URL } from '../../shared/services/api.js'
 
-const API_URL = import.meta.env.VITE_API_URL
 const initialProducts = [
   {
     id: 'ropa-camiseta-basica', name: 'Camiseta esencial', category: 'Camisetas', price: 39000, quantity: 12, stock: 12, icon: '👕', tone: 'bg-rose-50',
