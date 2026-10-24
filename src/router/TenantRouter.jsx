@@ -4,6 +4,8 @@ import LandingVexora from '../app/pages/LandingVexora.jsx'
 import { GREMIOS } from '../app/components/GremioSelector.jsx'
 import Register from '../app/pages/Register.jsx'
 import Login from '../app/pages/Login.jsx'
+import ForgotPassword from '../app/pages/ForgotPassword.jsx'
+import ResetPassword from '../app/pages/ResetPassword.jsx'
 import OnboardingGremios from '../app/pages/OnboardingGremios.jsx'
 import OnboardingDIAN from '../app/pages/OnboardingDIAN.jsx'
 import Billing from '../app/pages/Billing.jsx'
@@ -165,6 +167,8 @@ export default function TenantRouter() {
     void verifyLicense()
   }, [path, verifyLicense])
 
+  if (path === '/recuperar-contrasena') return <ForgotPassword />
+  if (path === '/restablecer-contrasena') return <ResetPassword />
   if (role === 'COCINA' && path !== '/pos') {
     return <main className="grid min-h-screen place-items-center bg-zinc-50 p-6"><section className="max-w-md rounded-2xl border bg-white p-6 text-center"><h1 className="text-xl font-black">Acceso de cocina</h1><p className="mt-2 text-sm text-zinc-600">Esta cuenta solo puede consultar y actualizar las comandas de comidas rápidas.</p><button type="button" onClick={logout} className="mt-5 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white">Cerrar sesión</button></section></main>
   }

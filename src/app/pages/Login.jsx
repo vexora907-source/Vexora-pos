@@ -53,6 +53,7 @@ export default function Login() {
           <form onSubmit={submit} className="mt-8 space-y-5">
             <label className="block text-sm font-semibold">Correo electrónico<input name="email" required type="email" autoComplete="username" placeholder="tu@negocio.com" className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3.5 outline-none transition focus:border-vexora-500 focus:ring-4 focus:ring-vexora-100" /></label>
             <label className="block text-sm font-semibold">Contraseña<input name="password" required type="password" autoComplete="current-password" className="mt-2 w-full rounded-xl border border-zinc-200 px-4 py-3.5 outline-none transition focus:border-vexora-500 focus:ring-4 focus:ring-vexora-100" /></label>
+            <div className="-mt-2 text-right"><a href="/recuperar-contrasena" className="text-sm font-semibold text-vexora-700 hover:text-vexora-900">¿Olvidaste tu contraseña?</a></div>
             {error && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</p>}
             <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-vexora-600 px-5 py-4 font-bold text-white hover:bg-vexora-700 disabled:cursor-wait disabled:opacity-60"><LogIn className="h-5 w-5" />{submitting ? 'Ingresando…' : 'Ingresar'}</button>
           </form>

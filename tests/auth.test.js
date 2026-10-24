@@ -30,7 +30,8 @@ Object.defineProperty(globalThis.window.sessionStorage, 'length', {
   configurable: true,
 })
 
-const { register } = await import('../src/shared/services/auth.js')
+const { register, requestPasswordReset } = await import('../src/shared/services/auth.js')
+const { isDemoMode, startDemoMode } = await import('../src/shared/services/tenantStorage.js')
 const { normalizeLicenseSummary } = await import('../src/shared/services/licenseService.js')
 
 test('normalizes license metadata and auto-renew status for the client', () => {
@@ -69,4 +70,13 @@ test('register rejects duplicate email before contacting the backend', async () 
     }),
     /Ya existe una cuenta con este correo\. Inicia sesión o usa otro correo\./,
   )
+})
+
+test('leaves demo mode before requesting a password reset', async () => {
+  localStorage.clear()
+  sessionStorage.clear()
+  startDemoMode()
+
+  await assert.rejects(requestPasswordReset('owner@example.com'), /servicio no está disponible/i)
+  assert.equal(isDemoMode(), false)
 })

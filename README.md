@@ -30,6 +30,11 @@ Guarda la variable y vuelve a desplegar el frontend, porque Vite la incorpora
 durante la compilación. No uses aquí `MONGODB_URI`, `JWT_SECRET` ni credenciales
 privadas: las variables con prefijo `VITE_` se publican en el navegador.
 
+La recuperación de contraseña está disponible desde **Iniciar sesión**. Para
+enviar los enlaces, configura en el backend `RESEND_API_KEY`, `RESEND_FROM` con
+un remitente verificado y `PUBLIC_APP_URL` con el origen público de este
+frontend.
+
 En el proyecto backend, configura `CORS_ORIGIN` con el origen exacto del
 frontend, por ejemplo `https://tu-frontend.vercel.app`. Para permitir más de un
 dominio, sepáralos por comas. Guarda el cambio y vuelve a desplegar el backend.

@@ -71,3 +71,19 @@ export async function login(email, password) {
     mapDuplicateEmailError(error)
   }
 }
+
+export async function requestPasswordReset(email) {
+  stopDemoMode()
+  return apiRequest('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email: normalizeEmail(email) }),
+  })
+}
+
+export async function resetPassword(token, password, passwordConfirmation) {
+  stopDemoMode()
+  return apiRequest('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password, passwordConfirmation }),
+  })
+}
