@@ -112,7 +112,7 @@ export default function Register() {
             {error && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</p>}
             <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-vexora-600 px-5 py-4 font-bold text-white hover:bg-vexora-700">Continuar al selector de gremios <ArrowRight className="h-5 w-5" /></button>
           </form>
-          <p className="mt-4 text-center text-xs leading-5 text-zinc-400">{API_URL ? 'Tu contraseña se conserva solo durante este registro y se envía al backend al finalizar la configuración.' : 'Demo de interfaz: activa VITE_API_URL para registrar cuentas en el backend.'}</p>
+          <p className="mt-4 text-center text-xs leading-5 text-zinc-400">{API_URL ? 'Tu contraseña se conserva solo durante este registro y se envía de forma segura al completar la configuración.' : 'El registro en línea no está disponible en este momento.'}</p>
         </div>
       </section>
       {privacyOpen && <PrivacyPolicy onClose={() => setPrivacyOpen(false)} />}

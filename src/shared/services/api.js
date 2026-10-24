@@ -7,7 +7,7 @@ const TOKEN_KEY = 'vexora.accessToken'
 
 export async function apiRequest(path, options = {}) {
   if (isDemoMode()) throw new Error('La cuenta demo funciona solo en este navegador y no guarda datos en el backend.')
-  if (!API_URL) throw new Error('Configura VITE_API_URL para conectar el backend.')
+  if (!API_URL) throw new Error('El servicio no está disponible en este momento. Inténtalo más tarde.')
   const headers = new Headers(options.headers)
   headers.set('Accept', 'application/json')
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
@@ -20,7 +20,7 @@ export async function apiRequest(path, options = {}) {
   try {
     response = await fetch(new URL(path, API_URL), { ...options, headers })
   } catch (cause) {
-    throw new Error('No se pudo conectar con el backend. Verifica que esté activo y que VITE_API_URL sea correcto.', { cause })
+    throw new Error('No fue posible completar la solicitud. Inténtalo de nuevo más tarde.', { cause })
   }
 
   const body = await response.text()

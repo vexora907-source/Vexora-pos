@@ -340,7 +340,7 @@ export default function Configuration() {
       </section>}
       {canConfigureDian && canManageDian && !demo && <div className="space-y-2">
         {dianSettingsLoading && <p role="status" className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">Cargando conexión Dataico…</p>}
-        {!API_URL && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Configura VITE_API_URL y conecta este negocio con el backend para administrar Dataico.</p>}
+        {!API_URL && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Esta función no está disponible en este momento. Inténtalo más tarde.</p>}
         <DianConfig
           initial={dianSettings}
           configured={Boolean(dianSettings.configured)}

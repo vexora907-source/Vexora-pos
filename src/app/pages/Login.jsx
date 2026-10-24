@@ -56,7 +56,7 @@ export default function Login() {
             {error && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</p>}
             <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-vexora-600 px-5 py-4 font-bold text-white hover:bg-vexora-700 disabled:cursor-wait disabled:opacity-60"><LogIn className="h-5 w-5" />{submitting ? 'Ingresando…' : 'Ingresar'}</button>
           </form>
-          <p className="mt-4 text-center text-xs leading-5 text-zinc-400">Necesitas el backend activo y una cuenta registrada para iniciar sesión.</p>
+          <p className="mt-4 text-center text-xs leading-5 text-zinc-400">Necesitas una cuenta registrada para iniciar sesión.</p>
         </div>
       </section>
     </main>
