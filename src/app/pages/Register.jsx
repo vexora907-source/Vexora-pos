@@ -3,7 +3,6 @@ import { ArrowLeft, ArrowRight, Layers3, ShieldCheck } from 'lucide-react'
 import { readTenant, saveTenant } from '../../shared/services/tenantStorage.js'
 import { API_URL } from '../../shared/services/api.js'
 import { saveRegistrationDraft } from '../../shared/services/registrationDraft.js'
-import { normalizeEmail } from '../../shared/services/auth.js'
 import PrivacyPolicy from '../components/PrivacyPolicy.jsx'
 
 export default function Register() {
@@ -30,13 +29,6 @@ export default function Register() {
       dianDepartmentName: String(form.get('dianDepartmentName')).trim(),
       dianEmail: String(form.get('dianEmail')).trim(),
       dianTaxRegime: String(form.get('dianTaxRegime')).trim(),
-    }
-
-    const normalizedEmail = normalizeEmail(business.email)
-    const existingEmail = normalizeEmail(tenant.business?.email)
-    if (normalizedEmail && existingEmail && normalizedEmail === existingEmail) {
-      setError('Ya existe una cuenta con este correo. Inicia sesión o usa otro correo.')
-      return
     }
 
     const privacyAccepted = form.get('privacyConsent') === 'accepted'

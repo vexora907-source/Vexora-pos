@@ -50,7 +50,7 @@ test('normalizes license metadata and auto-renew status for the client', () => {
   assert.equal(summary.validUntil, '2026-10-31T23:59:00.000Z')
 })
 
-test('register rejects duplicate email before contacting the backend', async () => {
+test('lets the backend decide whether a saved local email already has an account', async () => {
   localStorage.clear()
   sessionStorage.clear()
   localStorage.set('vexora.tenant', JSON.stringify({
@@ -68,7 +68,7 @@ test('register rejects duplicate email before contacting the backend', async () 
       password: '1234567890',
       gremios: ['papeleria'],
     }),
-    /Ya existe una cuenta con este correo\. Inicia sesión o usa otro correo\./,
+    /servicio no está disponible/i,
   )
 })
 

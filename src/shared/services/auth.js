@@ -1,5 +1,5 @@
 import { apiRequest } from './api.js'
-import { readTenant, stopDemoMode } from './tenantStorage.js'
+import { stopDemoMode } from './tenantStorage.js'
 
 const TOKEN_KEY = 'vexora.accessToken'
 const DUPLICATE_EMAIL_MESSAGE = 'Ya existe una cuenta con este correo. Inicia sesión o usa otro correo.'
@@ -21,15 +21,6 @@ export function clearAuthToken() {
   window.localStorage.removeItem(TOKEN_KEY)
 }
 
-function assertEmailAvailable(email) {
-  const normalizedEmail = normalizeEmail(email)
-  if (!normalizedEmail) return
-  const existingEmail = normalizeEmail(readTenant()?.business?.email)
-  if (existingEmail && existingEmail === normalizedEmail) {
-    throw new Error(DUPLICATE_EMAIL_MESSAGE)
-  }
-}
-
 function mapDuplicateEmailError(error) {
   const message = String(error?.message ?? '').toLowerCase()
   if (
@@ -44,7 +35,6 @@ function mapDuplicateEmailError(error) {
 export async function register(input) {
   stopDemoMode()
   const email = normalizeEmail(input?.email)
-  assertEmailAvailable(email)
   try {
     const result = await apiRequest('/api/auth/register', {
       method: 'POST',
