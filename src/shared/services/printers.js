@@ -122,7 +122,7 @@ async function getUsbPrinter(requestDevice) {
     throw new Error('Este navegador no permite USB directo. Usa Chrome o Edge actualizado.')
   }
   if (requestDevice) {
-    return navigator.usb.requestDevice({ filters: [{ classCode: 7 }, { vendorId: 0x0483 }] })
+    return navigator.usb.requestDevice({ acceptAllDevices: true })
   }
 
   const devices = await navigator.usb.getDevices()
@@ -175,19 +175,38 @@ async function printWebUsb(ticket, target, requestDevice) {
 
 async function printUsb(ticket, target, requestDevice = false) {
   if (isFirefoxDesktop()) {
-    if (await imprimirPosFirefox(target, ticket)) return
-    printUniversalTicket(ticket, target)
-    return
+    if (await imprimirPosFirefox(target, ticket)) return 'usb'
+    if (requestDevice) {
+      printUniversalTicket(ticket, target)
+      return 'system'
+    }
+    throw new Error('No está disponible la extensión de impresión de Firefox. Pulsa “Imprimir ticket” para abrir la impresión del sistema.')
   }
   if (typeof navigator.usb?.requestDevice === 'function') {
-    await printWebUsb(ticket, target, requestDevice)
-    return
+    try {
+      await printWebUsb(ticket, target, requestDevice)
+      return 'usb'
+    } catch (error) {
+      if (!requestDevice) throw error
+      printUniversalTicket(ticket, target)
+      return 'system'
+    }
   }
   if (typeof navigator.serial?.getPorts === 'function') {
-    await printWebSerial(ticket, target, requestDevice)
-    return
+    try {
+      await printWebSerial(ticket, target, requestDevice)
+      return 'serial'
+    } catch (error) {
+      if (!requestDevice) throw error
+      printUniversalTicket(ticket, target)
+      return 'system'
+    }
   }
-  printUniversalTicket(ticket, target)
+  if (requestDevice) {
+    printUniversalTicket(ticket, target)
+    return 'system'
+  }
+  throw new Error('La impresión directa no está disponible. Pulsa “Imprimir ticket” para abrir la impresión del sistema.')
 }
 
 export function isFirefoxDesktop(userAgent = globalThis.navigator?.userAgent ?? '') {
@@ -214,8 +233,7 @@ export async function printPrinterTest(gremio, target, printer) {
     total: 1000,
   }
   if (printer.tipo === 'usb') {
-    await printUsb(ticket, target, true)
-    return
+    return printUsb(ticket, target, true)
   }
   if (isDemoMode()) throw new Error('La demo no se conecta a impresoras de red ni al backend.')
   await apiRequest(`/api/printers/${encodeURIComponent(gremio)}/test/${target}`, { method: 'POST', body: '{}' })
@@ -259,5 +277,5 @@ export async function printReceipt(gremio, ticket, { requestDevice = true } = {}
     })
     return
   }
-  await printUsb(printableTicket, 'caja', requestDevice)
+  return printUsb(printableTicket, 'caja', requestDevice)
 }

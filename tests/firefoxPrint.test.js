@@ -6,12 +6,18 @@ let extensionAvailable = true
 let responseDelayMs = 0
 let userAgent = 'Mozilla/5.0 Firefox/128.0'
 let webUsbRequests = 0
+let systemPrintCalls = 0
 const listeners = new Set()
+const bodyClasses = new Set()
 
 globalThis.window = {
   location: { origin: 'http://localhost:5173' },
   sessionStorage: { getItem: (key) => key === 'vexora.demoMode' ? 'true' : null },
   localStorage: { getItem: () => null },
+  print() {
+    systemPrintCalls += 1
+    for (const listener of listeners) listener({ type: 'afterprint' })
+  },
   addEventListener: (_name, listener) => listeners.add(listener),
   removeEventListener: (_name, listener) => listeners.delete(listener),
   postMessage(message, targetOrigin) {
@@ -50,6 +56,7 @@ Object.defineProperty(globalThis, 'navigator', {
   value: {
     get userAgent() { return userAgent },
     usb: {
+      getDevices: async () => [],
       requestDevice: async () => {
         webUsbRequests += 1
         throw new Error('WebUSB request intercepted by the routing test')
@@ -58,6 +65,21 @@ Object.defineProperty(globalThis, 'navigator', {
   },
   configurable: true,
 })
+globalThis.document = {
+  createElement: () => ({
+    className: '',
+    setAttribute() {},
+    remove() {},
+    classList: { add() {}, remove() {} },
+  }),
+  body: {
+    append() {},
+    classList: {
+      add: (name) => bodyClasses.add(name),
+      remove: (name) => bodyClasses.delete(name),
+    },
+  },
+}
 
 const { imprimirPosFirefox } = await import('../src/shared/services/firefoxPrint.js')
 const { isFirefoxDesktop, printReceipt } = await import('../src/shared/services/printers.js')
@@ -95,14 +117,24 @@ test('routes Firefox receipt printing through the native extension', async () =>
   assert.equal(listeners.size, 0)
 })
 
-test('routes Chrome receipt printing through WebUSB, not the Firefox extension', async () => {
+test('falls back to the system print dialog when Chrome WebUSB fails manually', async () => {
   userAgent = 'Mozilla/5.0 Chrome/128.0 Safari/537.36'
   webUsbRequests = 0
-  await assert.rejects(
-    printReceipt('papeleria', { numero: 'T-3', productos: [], total: 1500 }),
-    /WebUSB request intercepted by the routing test/,
-  )
+  systemPrintCalls = 0
+  assert.equal(await printReceipt('papeleria', { numero: 'T-3', productos: [], total: 1500 }), 'system')
   assert.equal(webUsbRequests, 1)
+  assert.equal(systemPrintCalls, 1)
+  assert.equal(listeners.size, 0)
+})
+
+test('does not open a system print dialog after automatic Chrome printing fails', async () => {
+  userAgent = 'Mozilla/5.0 Chrome/128.0 Safari/537.36'
+  systemPrintCalls = 0
+  await assert.rejects(
+    printReceipt('papeleria', { numero: 'T-4', productos: [], total: 1500 }, { requestDevice: false }),
+    /No hay una impresora USB autorizada/,
+  )
+  assert.equal(systemPrintCalls, 0)
   assert.equal(listeners.size, 0)
 })
 

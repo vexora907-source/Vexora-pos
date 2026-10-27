@@ -128,8 +128,12 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
     setPrinterError('')
     setPrinterMessage('')
     try {
-      await printReceipt(saleGremio, copy ? { ...printerTicket, copy: true } : printerTicket, { requestDevice })
-      setPrinterMessage(copy ? 'Copia del ticket enviada a la impresora.' : 'Ticket enviado a la impresora.')
+      const method = await printReceipt(saleGremio, copy ? { ...printerTicket, copy: true } : printerTicket, { requestDevice })
+      if (method === 'system') {
+        setPrinterMessage('Se abrió la ventana de impresión. Selecciona tu impresora térmica y confirma.')
+      } else {
+        setPrinterMessage(copy ? 'Copia del ticket enviada a la impresora.' : 'Ticket enviado a la impresora.')
+      }
     } catch (cause) {
       setPrinterError(cause instanceof Error ? cause.message : 'No se pudo imprimir el ticket.')
     }

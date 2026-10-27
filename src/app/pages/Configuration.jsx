@@ -224,13 +224,16 @@ export default function Configuration() {
         }
       }
       if (printer.tipo === 'usb') {
-        await printPrinterTest(gremio, target, printer)
+        const method = await printPrinterTest(gremio, target, printer)
         await savePrinterConfig()
+        setMessage(method === 'system'
+          ? 'Se abrió la ventana de impresión. Selecciona la impresora térmica y confirma.'
+          : `Impresora de ${target} probada correctamente.`)
       } else {
         await savePrinterConfig()
         await printPrinterTest(gremio, target, printer)
+        setMessage(`Impresora de ${target} probada correctamente.`)
       }
-      setMessage(`Impresora de ${target} probada correctamente.`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `No se pudo probar la impresora de ${target}.`)
     } finally {
