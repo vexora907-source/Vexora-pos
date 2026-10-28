@@ -71,7 +71,7 @@ function Toggle({ label, checked, onChange, disabled = false }) {
   return <label className="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 p-3 text-sm font-medium"><span>{label}</span><input type="checkbox" checked={Boolean(checked)} onChange={onChange} disabled={disabled} className="h-4 w-4 accent-violet-600 disabled:cursor-not-allowed disabled:opacity-50" /></label>
 }
 
-function PrinterSettingsCard({ title, description, printer, busy, onChange, onTest }) {
+function PrinterSettingsCard({ title, description, printer, busy, disabled = false, onChange, onTest }) {
   return <section className="rounded-2xl border border-zinc-200 p-4">
     <div><h3 className="font-bold">{title}</h3><p className="mt-1 text-xs text-zinc-500">{description}</p></div>
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -79,7 +79,7 @@ function PrinterSettingsCard({ title, description, printer, busy, onChange, onTe
       {printer.tipo === 'red' && <Input label="IP privada de la impresora" value={printer.ip} onChange={(event) => onChange('ip', event.target.value)} placeholder="192.168.1.100" maxLength={15} />}
       <Toggle label="Imprimir automáticamente" checked={printer.imprimirAutomaticamente} onChange={(event) => onChange('imprimirAutomaticamente', event.target.checked)} />
     </div>
-    <button type="button" disabled={busy} onClick={onTest} className="mt-3 w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-50">{busy ? 'Probando…' : `Probar impresión ${title.toLowerCase()}`}</button>
+    <button type="button" disabled={busy || disabled} onClick={onTest} className="mt-3 w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Probando…' : disabled ? 'Cargando configuración…' : `Probar impresión ${title.toLowerCase()}`}</button>
   </section>
 }
 
@@ -87,6 +87,7 @@ export default function Configuration() {
   const tenantContext = useTenantGremio()
   const [tab, setTab] = useState('negocio')
   const [config, setConfig] = useState(DEFAULT_CONFIG)
+  const [configLoaded, setConfigLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -199,6 +200,10 @@ export default function Configuration() {
   }
 
   async function testPrinter(target) {
+    if (!configLoaded) {
+      setError('Espera a que la configuración guardada termine de cargar antes de probar la impresora.')
+      return
+    }
     const key = target === 'caja' ? 'impresoraCaja' : 'impresoraCocina'
     const printer = config.hardware[key]
     setPrinterTestBusy(target)
@@ -243,13 +248,21 @@ export default function Configuration() {
 
   useEffect(() => {
     let active = true
+    setConfigLoaded(false)
+    setError('')
     if (!gremio) return () => { active = false }
     const storageKey = `${STORAGE_KEY}:${gremio}`
     const load = demo
       ? Promise.resolve().then(() => JSON.parse(appStorage().getItem(storageKey) ?? 'null') ?? DEFAULT_CONFIG)
       : getBusinessConfig(gremio).then((result) => result.config)
-    load.then((value) => { if (active) setConfig(mergeConfig(value)) })
-      .catch((cause) => { if (active) setError(cause.message) })
+    load.then((value) => {
+      if (active) {
+        setConfig(mergeConfig(value))
+        setConfigLoaded(true)
+        setError('')
+      }
+    })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración guardada.') })
     return () => { active = false }
   }, [demo, gremio])
 
@@ -259,6 +272,10 @@ export default function Configuration() {
 
   async function submit(event) {
     event.preventDefault()
+    if (!configLoaded) {
+      setError('No se puede guardar hasta que la configuración guardada se haya cargado correctamente.')
+      return
+    }
     setBusy(true)
     setError('')
     setMessage('')
@@ -305,6 +322,7 @@ export default function Configuration() {
         description="Imprime facturas y tickets."
         printer={config.hardware.impresoraCaja}
         busy={printerTestBusy === 'caja'}
+        disabled={!configLoaded}
         onChange={(field, value) => updatePrinter('caja', field, value)}
         onTest={() => void testPrinter('caja')}
       />
@@ -313,6 +331,7 @@ export default function Configuration() {
         description="Imprime las comandas automáticamente al enviarlas."
         printer={config.hardware.impresoraCocina}
         busy={printerTestBusy === 'cocina'}
+        disabled={!configLoaded}
         onChange={(field, value) => updatePrinter('cocina', field, value)}
         onTest={() => void testPrinter('cocina')}
       />}
@@ -449,11 +468,14 @@ export default function Configuration() {
           <h2 className="text-xl font-black text-slate-900">{TABS.find((item) => item.id === tab)?.label}</h2>
           <div className="rounded-full bg-vexora-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.15em] text-vexora-700">clienteId · {tenant.user?.id ?? tenant.business?.email ?? 'sin id'}</div>
         </div>
-        {renderTab()}
+        {!configLoaded && <p role="status" className="mb-4 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">Cargando la configuración guardada de este negocio…</p>}
+        <fieldset disabled={!configLoaded} className="min-w-0 border-0 p-0">
+          {renderTab()}
+        </fieldset>
         {error && <p role="alert" className="mt-5 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
         {message && <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-vexora-600 px-5 py-3 font-bold text-white shadow-lg shadow-vexora-600/20 hover:bg-vexora-700 disabled:opacity-50"><Save className="h-4 w-4" />{busy ? 'Guardando…' : 'Guardar configuración'}</button>
+          <button type="submit" disabled={busy || !configLoaded} className="inline-flex items-center gap-2 rounded-xl bg-vexora-600 px-5 py-3 font-bold text-white shadow-lg shadow-vexora-600/20 hover:bg-vexora-700 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-4 w-4" />{busy ? 'Guardando…' : 'Guardar configuración'}</button>
           {demo && <p className="text-xs text-slate-500">Los cambios de demo viven únicamente en esta sesión.</p>}
         </div>
       </form>

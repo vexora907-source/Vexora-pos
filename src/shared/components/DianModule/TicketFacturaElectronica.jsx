@@ -52,9 +52,24 @@ export function TicketFacturaElectronica({ invoice, dian, business = {}, result,
     return () => style.remove()
   }, [])
 
+  function printInvoice() {
+    const cleanup = () => {
+      document.body.classList.remove('printing-invoice-ticket')
+      window.removeEventListener('afterprint', cleanup)
+    }
+    document.body.classList.add('printing-invoice-ticket')
+    window.addEventListener('afterprint', cleanup, { once: true })
+    try {
+      window.print()
+    } catch (cause) {
+      cleanup()
+      throw cause
+    }
+  }
+
   useEffect(() => {
     if (!autoPrint || (qrUrl && !qrImage && !qrError)) return undefined
-    const timer = window.setTimeout(() => window.print(), 100)
+    const timer = window.setTimeout(printInvoice, 100)
     return () => window.clearTimeout(timer)
   }, [autoPrint, qrError, qrImage, qrUrl])
 
@@ -73,7 +88,7 @@ export function TicketFacturaElectronica({ invoice, dian, business = {}, result,
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-zinc-950/60 p-4">
       <section role="dialog" aria-modal="true" aria-label="Factura electrónica para impresión" className="invoice-ticket-dialog w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
         <div className="print:hidden flex justify-end gap-2">
-          <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-lg bg-vexora-600 px-3 py-2 text-sm font-bold text-white"><Printer className="h-4 w-4" />{sample ? 'Imprimir muestra' : 'Imprimir factura'}</button>
+          <button type="button" onClick={printInvoice} className="inline-flex items-center gap-2 rounded-lg bg-vexora-600 px-3 py-2 text-sm font-bold text-white"><Printer className="h-4 w-4" />{sample ? 'Imprimir muestra' : 'Imprimir factura'}</button>
           <button type="button" onClick={onClose} aria-label="Cerrar factura" className="rounded-lg p-2 hover:bg-zinc-100"><X className="h-5 w-5" /></button>
         </div>
         <article id="ticket-dian" className="mx-auto mt-4 w-full bg-white p-3 font-mono text-[11px] leading-tight text-black print:mt-0 print:w-full print:p-0">
@@ -126,7 +141,6 @@ export function TicketFacturaElectronica({ invoice, dian, business = {}, result,
           {qrImage && <div className="text-center"><img src={qrImage} alt="Código QR para verificar la factura" className="mx-auto h-32 w-32" /><p className="break-all text-[8px]">Verifica en: {qrUrl}</p></div>}
           {qrError && <p className="text-center text-[9px]">No se pudo generar el QR localmente: {qrError}</p>}
           {!qrImage && !qrError && !qrUrl && <p className="text-center text-[9px]">El backend no suministró el enlace de verificación DIAN.</p>}
-          {cufe && <p className="mt-1 break-all text-center text-[8px]">CUFE: {cufe}</p>}
           <div className="my-2 border-t border-dashed border-black" />
           <footer className="text-center text-[9px]">
             {sample && <p className="mb-1 font-black">MUESTRA · SIN VALIDEZ FISCAL</p>}

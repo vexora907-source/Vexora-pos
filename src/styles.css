@@ -116,7 +116,68 @@ button {
   [role="dialog"].invoice-ticket-dialog {
     width: 80mm !important;
     max-width: 80mm !important;
-    padding: 5mm !important;
+    padding: 4mm !important;
+  }
+
+  body.printing-invoice-ticket [role="dialog"].invoice-ticket-dialog {
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 4mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  body.printing-invoice-ticket #ticket-dian {
+    width: 100% !important;
+    max-width: 72mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    overflow-wrap: anywhere !important;
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+  }
+
+  body.printing-invoice-ticket #ticket-dian table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+
+  body.printing-invoice-ticket #ticket-dian th,
+  body.printing-invoice-ticket #ticket-dian td {
+    padding: 2px 1px !important;
+    vertical-align: top !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  body.printing-invoice-ticket #ticket-dian th:first-child,
+  body.printing-invoice-ticket #ticket-dian td:first-child {
+    width: 48% !important;
+  }
+
+  body.printing-invoice-ticket #ticket-dian th:nth-child(2),
+  body.printing-invoice-ticket #ticket-dian td:nth-child(2) {
+    width: 14% !important;
+  }
+
+  body.printing-invoice-ticket #ticket-dian th:last-child,
+  body.printing-invoice-ticket #ticket-dian td:last-child {
+    width: 38% !important;
+  }
+
+  body.printing-invoice-ticket #ticket-dian img {
+    max-width: 100% !important;
+  }
+
+  body.printing-invoice-ticket .print\:hidden {
+    display: none !important;
   }
 
   .cash-receipt {

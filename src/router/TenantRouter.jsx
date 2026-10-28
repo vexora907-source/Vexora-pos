@@ -26,7 +26,7 @@ import { fetchLicenseStatus } from '../shared/services/licenseService.js'
 import { clearAuthToken, getAuthToken } from '../shared/services/auth.js'
 import { clearRegistrationDraft } from '../shared/services/registrationDraft.js'
 import { clearTenant } from '../shared/services/tenantStorage.js'
-import { readCashRegister } from '../shared/services/cashRegister.js'
+import { loadCashRegister, readCashRegister, refreshCashRegister } from '../shared/services/cashRegister.js'
 import { OfflineStatus } from '../shared/components/OfflineStatus.jsx'
 import { getCachedLicenseStatus } from '../shared/services/licenseService.js'
 import { isNetworkUnavailable, canSellOffline } from '../shared/services/offlineSales.js'
@@ -79,6 +79,8 @@ export default function TenantRouter() {
   const [licenseState, setLicenseState] = useState({ checking: false, status: null, error: '', sessionExpired: false })
   const [showDemoGremios, setShowDemoGremios] = useState(false)
   const [showTutorial, setShowTutorial] = useState(false)
+  const [cashLoading, setCashLoading] = useState(() => Boolean(API_URL && getAuthToken() && !tenant.isDemo))
+  const [cashSyncMessage, setCashSyncMessage] = useState('')
 
   const verifyLicense = useCallback(async () => {
     setLicenseState({ checking: true, status: null, error: '', sessionExpired: false })
@@ -159,6 +161,42 @@ export default function TenantRouter() {
     }
   }, [path, tenant.isDemo])
 
+  const gremioKey = gremios.join('|')
+  useEffect(() => {
+    if (tenant.isDemo || !API_URL || !getAuthToken() || !gremios.length) {
+      setCashLoading(false)
+      return undefined
+    }
+    let active = true
+    setCashLoading(true)
+    setCashSyncMessage('')
+    Promise.all(gremios.map((gremio) => loadCashRegister(gremio)))
+      .catch((cause) => {
+        if (active) setCashSyncMessage(cause instanceof Error
+          ? `No se pudo cargar la caja compartida: ${cause.message}. Se conservó la copia local.`
+          : 'No se pudo cargar la caja compartida. Se conservó la copia local.')
+      })
+      .finally(() => {
+        if (active) setCashLoading(false)
+      })
+    const onSyncError = (event) => {
+      if (active) setCashSyncMessage(`Caja guardada en este dispositivo, pero falta sincronizarla: ${event.detail?.message ?? 'error de conexión'}`)
+    }
+    const onOnline = () => {
+      void Promise.all(gremios.map((gremio) => refreshCashRegister(gremio)))
+        .catch((cause) => {
+          if (active) setCashSyncMessage(cause instanceof Error ? cause.message : 'No se pudo sincronizar la caja.')
+        })
+    }
+    window.addEventListener('vexora:cash-register-sync-error', onSyncError)
+    window.addEventListener('online', onOnline)
+    return () => {
+      active = false
+      window.removeEventListener('vexora:cash-register-sync-error', onSyncError)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [gremioKey, tenant.isDemo])
+
   useEffect(() => {
     if (path !== '/pos' || tenant.isDemo || !API_URL || !window.localStorage.getItem('vexora.accessToken')) {
       setLicenseState({ checking: false, status: null, error: '', sessionExpired: false })
@@ -177,6 +215,9 @@ export default function TenantRouter() {
   if (path === '/onboarding') return !tenant.isDemo && window.localStorage.getItem('vexora.accessToken') ? <LandingVexora /> : <OnboardingGremios />
   if (path === '/onboarding-dian') return !tenant.isDemo && window.localStorage.getItem('vexora.accessToken') ? <LandingVexora /> : gremios.length ? <OnboardingDIAN /> : <OnboardingGremios />
   if (path === '/billing') return <Billing />
+  if (cashLoading && ['/pos', '/admin', '/dashboard', '/configuracion'].includes(path)) {
+    return <main className="grid min-h-screen place-items-center bg-zinc-50 p-6"><p role="status" className="rounded-2xl border bg-white p-5 text-sm font-semibold text-zinc-700">Cargando los datos guardados de este negocio…</p></main>
+  }
   if (path === '/admin' || path === '/dashboard') return canAdmin ? <Admin /> : <Login />
   if (path === '/configuracion') return canAdmin ? <Configuration /> : <Login />
   const mustCheckLicense = path === '/pos' && !tenant.isDemo && Boolean(API_URL && window.localStorage.getItem('vexora.accessToken'))
@@ -208,6 +249,7 @@ export default function TenantRouter() {
       <header className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-6"><a href="/" className="font-black tracking-tight">VEXORA <span className="text-vexora-600">POS</span></a><div className="flex flex-wrap items-center justify-end gap-3">{role !== 'COCINA' && <a href="/billing" className="text-sm font-semibold text-vexora-700 hover:text-vexora-900">Plan y facturación</a>}<p className="hidden text-xs font-medium text-zinc-500 sm:block">{tenant.isDemo ? 'Espacio de negocio · Vista de demostración' : `Negocio · ${tenant.business?.name ?? tenant.business?.email ?? ''}`}</p>{tenant.user?.userCode && <p className="text-xs font-semibold text-zinc-700">Código de usuario: {tenant.user.userCode}</p>}<button type="button" onClick={logout} className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-3 py-2 text-sm font-bold text-zinc-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"><LogOut className="h-4 w-4" />{tenant.isDemo ? 'Cambiar a cuenta de pruebas' : 'Cerrar sesión'}</button></div></header>
       {accessibleGremios.length > 1 && <div className="mx-auto max-w-[1500px] px-4 pt-4 sm:px-6"><MultiGremioSwitcher gremios={accessibleGremios} activeGremio={effectiveGremio} onSelect={setActiveGremio} /></div>}
       {!tenant.isDemo && tenant.user && <OfflineStatus />}
+      {cashSyncMessage && <p role="alert" className="mx-auto mt-3 max-w-[1500px] px-4 text-sm font-semibold text-amber-800 sm:px-6">{cashSyncMessage}</p>}
       {tenant.isDemo && <div className="mx-auto max-w-[1500px] px-4 pt-3 sm:px-6">
         <button type="button" aria-expanded={showDemoGremios} onClick={() => setShowDemoGremios((visible) => !visible)} className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-bold text-violet-800 hover:bg-violet-50">
           {showDemoGremios ? 'Cerrar gremios de prueba' : 'Agregar o quitar gremios de prueba'}

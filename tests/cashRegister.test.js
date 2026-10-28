@@ -65,6 +65,58 @@ test('bloquea una venta cuyo valor individual supera el límite', async () => {
   )
 })
 
+test('mezcla ventas locales pendientes durante el mismo turno compartido', async () => {
+  const { mergeCashState } = await import('../src/shared/services/cashRegister.js')
+  const merged = mergeCashState({
+    isOpen: true,
+    openedAt: '2026-10-27T14:00:00.000Z',
+    sales: [{ id: 'remote', amount: 1000, paymentMethod: 'efectivo' }],
+    history: [],
+  }, {
+    isOpen: true,
+    openedAt: '2026-10-27T14:00:00.000Z',
+    sales: [{ id: 'local', amount: 2000, paymentMethod: 'tarjeta' }],
+    history: [],
+  })
+
+  assert.deepEqual(merged.sales.map((sale) => sale.id), ['remote', 'local'])
+})
+
+test('server state wins when local data belongs to an older or different shift', async () => {
+  const { mergeCashState } = await import('../src/shared/services/cashRegister.js')
+  const serverCash = {
+    isOpen: false,
+    openedAt: '2026-10-27T10:00:00.000Z',
+    closedAt: '2026-10-27T13:00:00.000Z',
+    sales: [],
+    history: [],
+  }
+  const merged = mergeCashState(serverCash, {
+    isOpen: true,
+    openedAt: '2026-10-27T11:00:00.000Z',
+    sales: [{ id: 'stale', amount: 1000, paymentMethod: 'efectivo' }],
+    history: [],
+  })
+
+  assert.equal(merged.isOpen, false)
+  assert.deepEqual(merged.sales, [])
+})
+
+test('migra la caja local anterior a una clave estable por negocio sin perder el turno', async () => {
+  const { readCashRegister } = await import('../src/shared/services/cashRegister.js')
+  localStorage.setItem('vexora.tenant', JSON.stringify({
+    id: 'tenant-123',
+    business: { email: 'negocio@example.com' },
+  }))
+  const previousKey = 'vexora.cash-register:negocio@example.com:papeleria'
+  const cash = { isOpen: true, openedAt: '2026-10-27T14:00:00.000Z', sales: [], history: [] }
+  localStorage.setItem(previousKey, JSON.stringify(cash))
+
+  assert.deepEqual(readCashRegister('papeleria'), cash)
+  assert.equal(localStorage.getItem('vexora.cash-register:tenant-123:papeleria'), JSON.stringify(cash))
+  assert.equal(localStorage.getItem(previousKey), null)
+})
+
 test('la cuenta demo guarda datos solo en sessionStorage y los elimina al salir', async () => {
   const { appStorage, clearTenant, saveTenant, startDemoMode } = await import('../src/shared/services/tenantStorage.js')
   localStorage.setItem('vexora.tenant', JSON.stringify({ business: { name: 'Cuenta real' } }))
