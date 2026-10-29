@@ -31,8 +31,10 @@ import { OfflineStatus } from '../shared/components/OfflineStatus.jsx'
 import { getCachedLicenseStatus } from '../shared/services/licenseService.js'
 import { isNetworkUnavailable, canSellOffline } from '../shared/services/offlineSales.js'
 import { TutorialGremio } from '../app/components/TutorialGremio.jsx'
-import { hasSeenTutorial, tutorialStorageKey } from '../shared/services/tutorial.js'
 import { SupportBubble } from '../shared/components/SupportBubble.jsx'
+import MiPublicidad from '../app/pages/MiPublicidad.jsx'
+import { AdvertisingBanner } from '../shared/components/AdvertisingBanner.jsx'
+import { hasSeenTutorial, tutorialStorageKey } from '../shared/services/tutorial.js'
 import { API_URL } from '../shared/services/api.js'
 
 const views = { papeleria: PapeleriaPOS, cerrajeria: CerrajeriaPOS, restaurante: RestaurantePOS, ferreteria: FerreteriaPOS, tienda: TiendaPOS, ropa: RopaPOS, comidas_rapidas: ComidasRapidasPOS }
@@ -216,7 +218,8 @@ export default function TenantRouter() {
   if (path === '/onboarding') return !tenant.isDemo && window.localStorage.getItem('vexora.accessToken') ? <LandingVexora /> : <OnboardingGremios />
   if (path === '/onboarding-dian') return !tenant.isDemo && window.localStorage.getItem('vexora.accessToken') ? <LandingVexora /> : gremios.length ? <OnboardingDIAN /> : <OnboardingGremios />
   if (path === '/billing') return <Billing />
-  if (cashLoading && ['/pos', '/admin', '/dashboard', '/configuracion'].includes(path)) {
+  if (path === '/publicidad') return canAdmin ? <MiPublicidad /> : <Login />
+  if (cashLoading && ['/pos', '/pos/admin', '/admin', '/dashboard', '/configuracion'].includes(path)) {
     return <main className="grid min-h-screen place-items-center bg-zinc-50 p-6"><p role="status" className="rounded-2xl border bg-white p-5 text-sm font-semibold text-zinc-700">Cargando los datos guardados de este negocio…</p></main>
   }
   if (path === '/admin' || path === '/dashboard') return canAdmin ? <Admin /> : <Login />
@@ -247,7 +250,7 @@ export default function TenantRouter() {
   const SelectedPOS = views[effectiveGremio] ?? views[accessibleGremios[0]]
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-6"><a href="/" className="font-black tracking-tight">VEXORA <span className="text-vexora-600">POS</span></a><div className="flex flex-wrap items-center justify-end gap-3">{role !== 'COCINA' && <a href="/billing" className="text-sm font-semibold text-vexora-700 hover:text-vexora-900">Plan y facturación</a>}<p className="hidden text-xs font-medium text-zinc-500 sm:block">{tenant.isDemo ? 'Espacio de negocio · Vista de demostración' : `Negocio · ${tenant.business?.name ?? tenant.business?.email ?? ''}`}</p>{tenant.user?.userCode && <p className="text-xs font-semibold text-zinc-700">Código de usuario: {tenant.user.userCode}</p>}<button type="button" onClick={logout} className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-3 py-2 text-sm font-bold text-zinc-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"><LogOut className="h-4 w-4" />{tenant.isDemo ? 'Cambiar a cuenta de pruebas' : 'Cerrar sesión'}</button></div></header>
+      <header className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-6"><a href="/" className="font-black tracking-tight">VEXORA <span className="text-vexora-600">POS</span></a><div className="flex flex-wrap items-center justify-end gap-3">{role !== 'COCINA' && <><a href="/billing" className="text-sm font-semibold text-vexora-700 hover:text-vexora-900">Plan y facturación</a>{canAdmin && <a href="/publicidad" className="text-sm font-semibold text-violet-700 hover:text-violet-900">Mi publicidad</a>}</>}<p className="hidden text-xs font-medium text-zinc-500 sm:block">{tenant.isDemo ? 'Espacio de negocio · Vista de demostración' : `Negocio · ${tenant.business?.name ?? tenant.business?.email ?? ''}`}</p>{tenant.user?.userCode && <p className="text-xs font-semibold text-zinc-700">Código de usuario: {tenant.user.userCode}</p>}<button type="button" onClick={logout} className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-3 py-2 text-sm font-bold text-zinc-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"><LogOut className="h-4 w-4" />{tenant.isDemo ? 'Cambiar a cuenta de pruebas' : 'Cerrar sesión'}</button></div></header>
       {accessibleGremios.length > 1 && <div className="mx-auto max-w-[1500px] px-4 pt-4 sm:px-6"><MultiGremioSwitcher gremios={accessibleGremios} activeGremio={effectiveGremio} onSelect={setActiveGremio} /></div>}
       {!tenant.isDemo && tenant.user && <OfflineStatus />}
       {cashSyncMessage && <p role="alert" className="mx-auto mt-3 max-w-[1500px] px-4 text-sm font-semibold text-amber-800 sm:px-6">{cashSyncMessage}</p>}
@@ -280,6 +283,7 @@ export default function TenantRouter() {
         <CashRegister key={activeGremio} gremio={activeGremio || gremios[0]} />
       </main>}
       {showTutorial && tutorialGremio && <TutorialGremio tenant={tenant} gremio={tutorialGremio} plan={tutorialPlan} onClose={() => setShowTutorial(false)} />}
+      <AdvertisingBanner enabled={!tenant.isDemo && path === '/pos' && posSection === 'sales' && role !== 'COCINA'} />
       <SupportBubble />
     </div>
   )
