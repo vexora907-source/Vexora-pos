@@ -32,6 +32,7 @@ import { getCachedLicenseStatus } from '../shared/services/licenseService.js'
 import { isNetworkUnavailable, canSellOffline } from '../shared/services/offlineSales.js'
 import { TutorialGremio } from '../app/components/TutorialGremio.jsx'
 import { hasSeenTutorial, tutorialStorageKey } from '../shared/services/tutorial.js'
+import { SupportBubble } from '../shared/components/SupportBubble.jsx'
 import { API_URL } from '../shared/services/api.js'
 
 const views = { papeleria: PapeleriaPOS, cerrajeria: CerrajeriaPOS, restaurante: RestaurantePOS, ferreteria: FerreteriaPOS, tienda: TiendaPOS, ropa: RopaPOS, comidas_rapidas: ComidasRapidasPOS }
@@ -279,6 +280,7 @@ export default function TenantRouter() {
         <CashRegister key={activeGremio} gremio={activeGremio || gremios[0]} />
       </main>}
       {showTutorial && tutorialGremio && <TutorialGremio tenant={tenant} gremio={tutorialGremio} plan={tutorialPlan} onClose={() => setShowTutorial(false)} />}
+      <SupportBubble />
     </div>
   )
 }

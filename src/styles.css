@@ -218,3 +218,4 @@ button {
   .support-widget { bottom: 14px; right: 14px; }
   .support-panel { bottom: 66px; height: min(500px, calc(100dvh - 105px)); }
 }
+.support-message-pending { align-items: center; color: #6658e8; display: inline-flex; margin-left: 5px; vertical-align: middle; }

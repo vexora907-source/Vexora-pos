@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { LifeBuoy, MessageCircle, Send, X } from 'lucide-react'
+import { Check, LifeBuoy, MessageCircle, Send, X } from 'lucide-react'
 import { fetchSupportMessages, isSupportEnabled, sendSupportMessage, synchronizeSupportOutbox } from '../services/support.js'
+import { isNetworkUnavailable } from '../services/offlineSales.js'
 
 function formatTime(value) {
   return new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
@@ -14,7 +15,6 @@ export function SupportBubble() {
   const [connected, setConnected] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const endRef = useRef(null)
   const enabled = isSupportEnabled()
 
@@ -36,7 +36,7 @@ export function SupportBubble() {
       } catch (cause) {
         if (active) {
           setConnected(false)
-          setError(cause.message)
+          setError(isNetworkUnavailable(cause) ? '' : cause.message)
           setWaiting((count) => Math.max(count, 1))
         }
       }
@@ -60,7 +60,6 @@ export function SupportBubble() {
     if (!draft.trim() || sending) return
     setSending(true)
     setError('')
-    setNotice('')
     try {
       const message = await sendSupportMessage(draft)
       setDraft('')
@@ -69,9 +68,9 @@ export function SupportBubble() {
         senderName: 'Tú',
         direction: 'pos',
         local: true,
+        pending: true,
       }])
       setWaiting((count) => count + 1)
-      setNotice('Mensaje guardado y en espera de confirmación del CRM.')
     } catch (cause) {
       setError(cause.message)
     } finally {
@@ -95,12 +94,19 @@ export function SupportBubble() {
             <article key={`${message.messageId ?? message.createdAt}-${index}`} className={`support-bubble-message ${message.direction === 'pos' ? 'support-bubble-own' : ''}`}>
               <strong>{message.senderName}</strong>
               <p>{message.body}</p>
-              <small>{formatTime(message.createdAt)}{message.pending ? ' · En espera' : ''}</small>
+              <small>
+                {formatTime(message.createdAt)}
+                {message.direction === 'pos' && message.pending && (
+                  <span className="support-message-pending" role="status" aria-label="Enviado; esperando recepción del CRM" title="Enviado; esperando recepción del CRM">
+                    <Check size={13} aria-hidden="true" />
+                  </span>
+                )}
+              </small>
             </article>
           ))}
           <div ref={endRef} />
         </div>
-        {(error || notice) && <p role={error ? 'alert' : 'status'} className={`support-panel-feedback ${error ? 'support-panel-error' : ''}`}>{error || notice}</p>}
+        {error && <p role="alert" className="support-panel-feedback support-panel-error">{error}</p>}
         <form className="support-panel-form" onSubmit={(event) => void submit(event)}>
           <textarea value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={2000} placeholder="Escribe tu mensaje…" aria-label="Mensaje de soporte" required />
           <button type="submit" disabled={sending || !draft.trim()} aria-label="Enviar mensaje">{sending ? '…' : <Send size={17} />}</button>
