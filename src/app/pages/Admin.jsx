@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ClipboardList, FileBarChart, KeyRound, Pencil, Plus, Save, Users } from 'lucide-react'
+import { ArrowLeft, Banknote, ClipboardList, KeyRound, LayoutDashboard, LockKeyhole, Package, Pencil, Plus, Printer, Save, TrendingUp, Users, Wallet } from 'lucide-react'
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { assignTenantGremios, createAdminUser, createBranch, getAdminActivity, getAdminLicenses, getAdminUsers, getSalesReport, updateAdminUser } from '../../shared/services/admin.js'
+import { assignTenantGremios, createAdminUser, createBranch, createExpense, getAccountingReport, getAdminActivity, getAdminLicenses, getAdminUsers, getInventoryReport, getSalesReport, updateAdminUser } from '../../shared/services/admin.js'
+import { adminPlanHasFeature, canonicalAdminPlan, FEATURE_PLANS } from '../../shared/services/adminPlanFeatures.js'
+import { CashRegister } from '../../shared/components/CashRegister/CashRegister.jsx'
+import { fetchLicenseSummary } from '../../shared/services/licenseService.js'
+import { printUniversalTicket } from '../../shared/services/thermalPrint.js'
 import { readTenant } from '../../shared/services/tenantStorage.js'
 
 const gremioLabels = { papeleria: 'Papelería', cerrajeria: 'Cerrajería', restaurante: 'Restaurante', ferreteria: 'Ferretería', tienda: 'Tienda', ropa: 'Ropa', comidas_rapidas: 'Comidas rápidas' }
@@ -13,11 +17,60 @@ const dateValue = (date) => date.toISOString().slice(0, 10)
 const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value ?? 0)
 const chartColors = ['#0F172A', '#334155', '#64748B', '#94A3B8', '#7C3AED', '#0F766E', '#D97706']
 const tabs = [
-  { id: 'sales', label: 'Ventas', icon: FileBarChart },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'accounting', label: 'Contabilidad', icon: Wallet },
+  { id: 'inventory', label: 'Inventario', icon: Package },
+  { id: 'cash', label: 'Caja', icon: Banknote },
   { id: 'users', label: 'Usuarios', icon: Users },
   { id: 'activity', label: 'Actividad', icon: ClipboardList },
   { id: 'licenses', label: 'Licencias', icon: KeyRound },
 ]
+const planNames = { INICIO: 'Inicio', NEGOCIO: 'Negocio', PRO: 'Pro', VEXORA: 'Vexora' }
+
+function UpgradeNotice({ feature, currentPlan }) {
+  const requiredPlan = FEATURE_PLANS[feature]
+  return <section className="rounded-2xl border border-violet-200 bg-violet-50 p-5">
+    <div className="flex items-start gap-3">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700"><LockKeyhole className="h-5 w-5" /></span>
+      <div className="min-w-0 flex-1">
+        <h3 className="font-black text-violet-950">Disponible desde el plan {planNames[requiredPlan]}</h3>
+        <p className="mt-1 text-sm text-violet-800">Tu plan actual es {planNames[currentPlan]}. Actualiza tu plan para desbloquear esta función.</p>
+        <a href="/billing" className="mt-3 inline-flex rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-800">Ver planes y actualizar</a>
+      </div>
+    </div>
+  </section>
+}
+
+function printInventoryA4() {
+  if (typeof window.print !== 'function') throw new Error('Este navegador no ofrece impresión del sistema.')
+  const cleanup = () => {
+    window.removeEventListener('afterprint', cleanup)
+    document.body.classList.remove('printing-inventory-a4')
+  }
+  document.body.classList.add('printing-inventory-a4')
+  window.addEventListener('afterprint', cleanup, { once: true })
+  try {
+    window.print()
+  } catch (cause) {
+    cleanup()
+    throw cause
+  }
+}
+
+function printInventoryThermal(report) {
+  printUniversalTicket({
+    tipo: 'INVENTARIO',
+    createdAt: new Date().toISOString(),
+    gremio: gremioLabels[report.gremio] ?? report.gremio,
+    negocio: { nombre: 'VEXORA POS' },
+    total: report.metrics?.stockValue ?? 0,
+    productos: (report.products ?? []).map((product) => ({
+      cantidad: product.stock,
+      nombre: product.name,
+      total: product.stockValue,
+    })),
+  }, 'caja')
+}
 
 function UserEditor({ user, branches, gremios, onSave }) {
   const [editing, setEditing] = useState(false)
@@ -91,27 +144,64 @@ function UserEditor({ user, branches, gremios, onSave }) {
 export default function Admin() {
   const tenant = readTenant()
   const isSuperAdmin = tenant.user?.role === 'SUPER_ADMIN'
-  const [tab, setTab] = useState('sales')
+  const [currentPlan, setCurrentPlan] = useState(canonicalAdminPlan(tenant.plan))
+  const [tab, setTab] = useState('dashboard')
   const [users, setUsers] = useState([])
   const [activity, setActivity] = useState([])
   const [licenses, setLicenses] = useState([])
   const [report, setReport] = useState({ sales: [], summary: [], daily: [], byGremio: [], topProducts: [], metrics: {}, truncated: false })
+  const [inventoryReports, setInventoryReports] = useState({})
+  const [accountingReport, setAccountingReport] = useState({ income: 0, expenses: 0, net: 0, tickets: 0, expenseCount: 0, expenseRecords: [] })
   const [branches, setBranches] = useState(tenant.sucursales ?? [])
   const [from, setFrom] = useState(dateValue(new Date(Date.now() - 29 * 86400000)))
   const [to, setTo] = useState(dateValue(new Date()))
   const [gremio, setGremio] = useState(tenant.gremios?.[0] ?? '')
+  const [reportGremio, setReportGremio] = useState(tenant.gremios?.[0] ?? '')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
   const [salesRange, setSalesRange] = useState('30')
+  const [expenseBusy, setExpenseBusy] = useState(false)
+  const [expenseError, setExpenseError] = useState('')
+  const [planError, setPlanError] = useState('')
 
   const branchesForGremio = useMemo(() => branches.filter((branch) => branch.gremio === gremio), [branches, gremio])
+
+  useEffect(() => {
+    let active = true
+    fetchLicenseSummary()
+      .then((summary) => {
+        if (active && summary?.plan) setCurrentPlan(canonicalAdminPlan(summary.plan))
+      })
+      .catch((cause) => {
+        if (active) setPlanError(cause instanceof Error ? `No se pudo validar el plan actual: ${cause.message}` : 'No se pudo validar el plan actual.')
+      })
+    return () => { active = false }
+  }, [])
+
+  async function loadInventoryReports() {
+    const results = await Promise.all((tenant.gremios ?? []).map((id) => getInventoryReport(id)))
+    setInventoryReports(Object.fromEntries(results.map((result) => [result.gremio, result])))
+  }
 
   async function loadTab(nextTab = tab) {
     setLoading(true)
     setError('')
     try {
-      if (nextTab === 'sales') setReport(await getSalesReport(from, to))
+      if (nextTab === 'dashboard') {
+        const [sales, inventory, accounting] = await Promise.all([
+          getSalesReport(from, to),
+          Promise.all((tenant.gremios ?? []).map((id) => getInventoryReport(id))),
+          adminPlanHasFeature(currentPlan, 'accounting') ? getAccountingReport(from, to) : Promise.resolve(null),
+        ])
+        setReport(sales)
+        setInventoryReports(Object.fromEntries(inventory.map((result) => [result.gremio, result])))
+        if (accounting) setAccountingReport(accounting)
+      }
+      if (nextTab === 'inventory') await loadInventoryReports()
+      if (nextTab === 'accounting' && adminPlanHasFeature(currentPlan, 'accounting')) {
+        setAccountingReport(await getAccountingReport(from, to))
+      }
       if (nextTab === 'users') {
         const result = await getAdminUsers()
         setUsers(result.users)
@@ -131,7 +221,7 @@ export default function Admin() {
     }
   }
 
-  useEffect(() => { void loadTab(tab) }, [tab, from, to])
+  useEffect(() => { void loadTab(tab) }, [tab, from, to, currentPlan])
 
   async function submitUser(event) {
     event.preventDefault()
@@ -194,6 +284,29 @@ export default function Admin() {
     }
   }
 
+  async function submitExpense(event) {
+    event.preventDefault()
+    setExpenseError('')
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
+    setExpenseBusy(true)
+    try {
+      await createExpense({
+        description: String(form.get('description')),
+        category: String(form.get('category')),
+        amount: Number(form.get('amount')),
+        date: String(form.get('date')),
+      })
+      formElement.reset()
+      setAccountingReport(await getAccountingReport(from, to))
+      setNotice('Gasto registrado correctamente.')
+    } catch (cause) {
+      setExpenseError(cause instanceof Error ? cause.message : 'No se pudo registrar el gasto.')
+    } finally {
+      setExpenseBusy(false)
+    }
+  }
+
   async function updateTenantGremios(license, nextGremios) {
     setError('')
     setNotice('')
@@ -211,6 +324,8 @@ export default function Admin() {
   const totalCount = report.metrics?.tickets ?? report.sales.length
   const productsWithSales = report.topProducts ?? []
   const salesByGremio = report.byGremio ?? []
+  const allCriticalProducts = Object.values(inventoryReports).flatMap((inventory) => inventory.criticalProducts ?? [])
+  const inventoryForGremio = inventoryReports[reportGremio] ?? { products: [], criticalProducts: [], metrics: {} }
 
   return <main className="min-h-screen bg-slate-100 p-4 text-slate-900 sm:p-6"><div className="mx-auto flex max-w-[1600px] gap-6">
     <aside className="hidden w-[260px] shrink-0 rounded-[28px] border border-slate-200 bg-white/85 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.06)] backdrop-blur xl:block">
@@ -236,21 +351,25 @@ export default function Admin() {
         <div>
           <a href="/pos" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500"><ArrowLeft className="h-4 w-4" />Volver al punto de venta</a>
           <p className="mt-4 text-xs font-bold uppercase tracking-[0.22em] text-vexora-600">Administración del negocio</p>
-          <h1 className="mt-1 text-3xl font-black text-slate-900">Panel administrativo</h1>
+          <h1 className="mt-1 text-3xl font-black text-slate-900">Panel administrativo · {planNames[currentPlan]}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start">
           {tabs.filter((item) => item.id !== 'licenses' || isSuperAdmin).map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)} className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition ${tab === id ? 'bg-slate-900 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}><Icon className="h-4 w-4" />{label}</button>)}
         </div>
       </div>
-      <p className="mt-4 text-sm text-slate-600">{isSuperAdmin ? 'Acceso de plataforma y administración del negocio.' : 'Gestiona usuarios, actividad y reportes de tu negocio.'}</p>
+      <p className="mt-4 text-sm text-slate-600">{isSuperAdmin ? 'Acceso de plataforma y administración del negocio.' : 'Consulta ventas, utilidad, inventario y caja; administra también usuarios y actividad.'}</p>
       {error && <p role="alert" className="mt-4 rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">{error}</p>}
+      {planError && <p role="alert" className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">{planError} Se usó el último plan guardado en este dispositivo.</p>}
       {notice && <p role="status" className="mt-4 rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</p>}
       {loading && <p className="mt-4 text-sm text-slate-500">Cargando información…</p>}
 
-    {tab === 'sales' && <section className="mt-5 space-y-5">
-      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><label className="text-sm font-semibold">Periodo<select value={salesRange} onChange={(event) => setDateRange(event.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2.5"><option value="7">Últimos 7 días</option><option value="30">Últimos 30 días</option><option value="month">Este mes</option></select></label><label className="text-sm font-semibold">Desde<input type="date" value={from} onChange={(event) => { setSalesRange('custom'); setFrom(event.target.value) }} className="mt-1 w-full rounded-lg border bg-white p-2.5" /></label><label className="text-sm font-semibold">Hasta<input type="date" value={to} onChange={(event) => { setSalesRange('custom'); setTo(event.target.value) }} className="mt-1 w-full rounded-lg border bg-white p-2.5" /></label><button type="button" onClick={() => loadTab('sales')} className="self-end rounded-xl bg-vexora-600 px-4 py-2.5 font-bold text-white">Actualizar</button></div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Ventas totales</p><p className="mt-2 text-2xl font-black">{money(totalSales)}</p></article><article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Tickets</p><p className="mt-2 text-2xl font-black">{totalCount}</p></article><article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Ticket promedio</p><p className="mt-2 text-2xl font-black">{money(report.metrics?.average ?? 0)}</p></article><article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Gremios con ventas</p><p className="mt-2 text-2xl font-black">{salesByGremio.length}</p></article></div>
+    {tab === 'dashboard' && <section className="mt-5 space-y-5">
+      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><label className="text-sm font-semibold">Periodo<select value={salesRange} onChange={(event) => setDateRange(event.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2.5"><option value="7">Últimos 7 días</option><option value="30">Últimos 30 días</option><option value="month">Este mes</option></select></label><label className="text-sm font-semibold">Desde<input type="date" value={from} onChange={(event) => { setSalesRange('custom'); setFrom(event.target.value) }} className="mt-1 w-full rounded-lg border bg-white p-2.5" /></label><label className="text-sm font-semibold">Hasta<input type="date" value={to} onChange={(event) => { setSalesRange('custom'); setTo(event.target.value) }} className="mt-1 w-full rounded-lg border bg-white p-2.5" /></label><button type="button" onClick={() => loadTab('dashboard')} className="self-end rounded-xl bg-vexora-600 px-4 py-2.5 font-bold text-white">Actualizar</button></div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Ventas totales</p><p className="mt-2 text-2xl font-black">{money(totalSales)}</p></article><article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Tickets</p><p className="mt-2 text-2xl font-black">{totalCount}</p></article><article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Ticket promedio</p><p className="mt-2 text-2xl font-black">{money(report.metrics?.average ?? 0)}</p></article><article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Gremios con ventas</p><p className="mt-2 text-2xl font-black">{salesByGremio.length}</p></article><article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Resultado neto operativo</p>{adminPlanHasFeature(currentPlan, 'accounting') ? <p className="mt-2 text-2xl font-black">{money(accountingReport.net)}</p> : <a href="/billing" className="mt-2 inline-flex text-sm font-bold text-violet-700">Disponible desde Negocio · subir plan</a>}</article></div>
+      {adminPlanHasFeature(currentPlan, 'accounting') && <p className="text-xs text-zinc-500">Resultado neto = ventas − gastos registrados; no incluye costo de mercancía.</p>}
+      <article className="rounded-2xl border bg-white p-5"><h2 className="flex items-center gap-2 font-bold"><TrendingUp className="h-4 w-4" />Stock crítico · hasta 5 unidades</h2><div className="mt-3 space-y-2">{allCriticalProducts.slice(0, 8).map((product) => <div key={`${product.id}-${product.name}`} className="flex items-center justify-between gap-3 rounded-xl bg-amber-50 p-3 text-sm"><span>{product.name}</span><b className="text-amber-900">{product.stock} unidades</b></div>)}{!allCriticalProducts.length && <p className="text-sm text-zinc-500">No hay productos con stock crítico registrado.</p>}</div></article>
       {report.truncated && <p className="text-sm text-amber-800">El reporte está limitado a las 500 ventas más recientes; acota las fechas para consultar el periodo completo.</p>}
+      {adminPlanHasFeature(currentPlan, 'advancedCharts') ? <>
       <div className="grid gap-5 xl:grid-cols-[2fr_1fr]">
         <article className="rounded-2xl border bg-white p-5"><h2 className="font-bold text-slate-900">Evolución de ventas</h2><div className="mt-4 h-72"><ResponsiveContainer width="100%" height="100%"><AreaChart data={report.daily ?? []}><defs><linearGradient id="vexoraSalesFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0F172A" stopOpacity={0.2} /><stop offset="95%" stopColor="#0F172A" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" /><XAxis dataKey="fecha" tickFormatter={(value) => new Date(`${value}T12:00:00`).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })} fontSize={11} /><YAxis tickFormatter={(value) => `$${Math.round(value / 1000)}k`} fontSize={11} /><Tooltip formatter={(value) => money(value)} labelFormatter={(value) => value} /><Area type="monotone" dataKey="ventas" name="Ventas" stroke="#0F172A" strokeWidth={2.5} fill="url(#vexoraSalesFill)" /></AreaChart></ResponsiveContainer></div></article>
         <article className="rounded-2xl border bg-white p-5"><h2 className="font-bold text-slate-900">Ventas por gremio</h2><div className="mt-3 h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={salesByGremio} dataKey="value" nameKey="gremio" innerRadius={62} outerRadius={92} paddingAngle={4}>{salesByGremio.map((row, index) => <Cell key={row.gremio} fill={chartColors[index % chartColors.length]} />)}</Pie><Tooltip formatter={(value) => money(value)} labelFormatter={(value) => gremioLabels[value] ?? value} /></PieChart></ResponsiveContainer></div><div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px]">{salesByGremio.map((row, index) => <span key={row.gremio} className="inline-flex items-center gap-1"><i className="h-2 w-2 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} />{gremioLabels[row.gremio] ?? row.gremio}</span>)}</div></article>
@@ -259,8 +378,62 @@ export default function Admin() {
         <article className="rounded-2xl border bg-white p-5"><h2 className="font-bold text-slate-900">Productos más vendidos</h2><div className="mt-4 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={productsWithSales} layout="vertical" margin={{ left: 10 }}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" /><XAxis type="number" fontSize={11} /><YAxis dataKey="name" type="category" width={120} fontSize={11} /><Tooltip formatter={(value) => `${value} unidades`} /><Bar dataKey="ventas" name="Unidades" fill="#0F172A" radius={[0, 8, 8, 0]} /></BarChart></ResponsiveContainer></div></article>
         <article className="rounded-2xl border bg-white p-5"><h2 className="font-bold text-slate-900">Registro reciente</h2><div className="mt-4 max-h-72 space-y-2 overflow-y-auto">{report.sales.slice(0, 8).map((sale) => <div key={sale.saleKey} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"><div><p className="text-sm font-semibold">{gremioLabels[sale.gremio] ?? sale.gremio} · {sale.user?.name ?? 'Usuario'}</p><p className="mt-1 text-xs text-slate-500">{new Date(sale.createdAt).toLocaleString('es-CO')} · {sale.paymentMethod}</p></div><b className="whitespace-nowrap text-sm">{money(sale.total)}</b></div>)}{!report.sales.length && <p className="py-8 text-center text-sm text-zinc-500">No hay ventas en este periodo.</p>}</div></article>
       </div>
+      </> : <UpgradeNotice feature="advancedCharts" currentPlan={currentPlan} />}
       <div className="overflow-x-auto rounded-2xl border bg-white"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-zinc-100 text-xs uppercase text-zinc-500"><tr><th className="p-3">Fecha</th><th className="p-3">Gremio</th><th className="p-3">Cajero</th><th className="p-3">N.º ventas</th><th className="p-3">Total</th></tr></thead><tbody>{report.summary.map((row) => <tr key={`${row.fecha}:${row.gremio}:${row.cajero}`} className="border-t"><td className="p-3">{row.fecha}</td><td className="p-3">{gremioLabels[row.gremio] ?? row.gremio}</td><td className="p-3">{row.cajero}</td><td className="p-3">{row.ventas}</td><td className="p-3 font-bold">{money(row.total)}</td></tr>)}{!report.summary.length && <tr><td colSpan="5" className="p-6 text-center text-zinc-500">Sin datos agregados para este periodo.</td></tr>}</tbody></table></div>
       <details className="overflow-hidden rounded-2xl border bg-white"><summary className="cursor-pointer p-4 font-bold">Ver historial detallado de ventas</summary><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-zinc-100 text-xs uppercase text-zinc-500"><tr><th className="p-3">Fecha</th><th className="p-3">Gremio</th><th className="p-3">Cajero</th><th className="p-3">Pago</th><th className="p-3">Total</th></tr></thead><tbody>{report.sales.map((sale) => <tr key={sale.saleKey} className="border-t"><td className="p-3">{new Date(sale.createdAt).toLocaleString('es-CO')}</td><td className="p-3">{gremioLabels[sale.gremio] ?? sale.gremio}</td><td className="p-3">{sale.user?.name ?? 'Usuario'}</td><td className="p-3">{sale.paymentMethod}</td><td className="p-3 font-bold">{money(sale.total)}</td></tr>)}{!report.sales.length && <tr><td colSpan="5" className="p-8 text-center text-zinc-500">No hay ventas en el periodo seleccionado.</td></tr>}</tbody></table></div></details>
+    </section>}
+
+    {tab === 'accounting' && <section className="mt-5 space-y-5">
+      {adminPlanHasFeature(currentPlan, 'accounting') ? <>
+        <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-semibold">Desde<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2.5" /></label><label className="text-sm font-semibold">Hasta<input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2.5" /></label></div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Ingresos por ventas</p><p className="mt-2 text-2xl font-black">{money(accountingReport.income)}</p><p className="mt-1 text-xs text-zinc-500">{accountingReport.tickets} tickets</p></article>
+          <article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Egresos / gastos registrados</p><p className="mt-2 text-2xl font-black">{money(accountingReport.expenses)}</p><p className="mt-1 text-xs text-zinc-500">{accountingReport.expenseCount} registros</p></article>
+          <article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Resultado neto operativo</p><p className={`mt-2 text-2xl font-black ${accountingReport.net < 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{money(accountingReport.net)}</p></article>
+        </div>
+        <p className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">El resultado se calcula como ventas menos gastos registrados. No descuenta costo de mercancía porque las ventas históricas no guardan el costo unitario.</p>
+        <form onSubmit={submitExpense} className="grid gap-3 rounded-2xl border bg-white p-5 sm:grid-cols-2 xl:grid-cols-5">
+          <h2 className="font-black sm:col-span-2 xl:col-span-5">Registrar gasto</h2>
+          <label className="text-sm font-semibold">Descripción<input required minLength="2" maxLength="160" name="description" placeholder="Ej. Pago de servicios" className="mt-1 w-full rounded-lg border p-2.5 font-normal" /></label>
+          <label className="text-sm font-semibold">Categoría<input required minLength="2" maxLength="60" name="category" placeholder="Servicios, transporte…" className="mt-1 w-full rounded-lg border p-2.5 font-normal" /></label>
+          <label className="text-sm font-semibold">Valor COP<input required type="number" min="1" step="1" name="amount" className="mt-1 w-full rounded-lg border p-2.5 font-normal" /></label>
+          <label className="text-sm font-semibold">Fecha<input required type="date" name="date" defaultValue={to} className="mt-1 w-full rounded-lg border p-2.5 font-normal" /></label>
+          <button type="submit" disabled={expenseBusy} className="self-end rounded-xl bg-vexora-600 px-4 py-2.5 font-bold text-white disabled:opacity-50">{expenseBusy ? 'Guardando…' : 'Guardar gasto'}</button>
+          {expenseError && <p role="alert" className="text-sm text-rose-700 sm:col-span-2 xl:col-span-5">{expenseError}</p>}
+        </form>
+        <div className="overflow-x-auto rounded-2xl border bg-white">
+          <table className="w-full min-w-[600px] text-left text-sm"><thead className="bg-zinc-100 text-xs uppercase text-zinc-500"><tr><th className="p-3">Fecha</th><th className="p-3">Descripción</th><th className="p-3">Categoría</th><th className="p-3">Registró</th><th className="p-3">Valor</th></tr></thead><tbody>
+            {accountingReport.expenseRecords.map((expense) => <tr key={expense._id} className="border-t"><td className="p-3">{new Date(expense.spentAt).toLocaleDateString('es-CO')}</td><td className="p-3">{expense.description}</td><td className="p-3">{expense.category}</td><td className="p-3">{expense.createdBy?.name ?? 'Usuario'}</td><td className="p-3 font-bold">{money(expense.amount)}</td></tr>)}
+            {!accountingReport.expenseRecords.length && <tr><td colSpan="5" className="p-6 text-center text-zinc-500">No hay gastos registrados en este periodo.</td></tr>}
+          </tbody></table>
+        </div>
+        {accountingReport.truncated && <p className="text-sm text-amber-800">Se muestran los 300 gastos más recientes de este periodo.</p>}
+      </> : <UpgradeNotice feature="accounting" currentPlan={currentPlan} />}
+    </section>}
+
+    {tab === 'inventory' && <section className="mt-5 space-y-5">
+      <label className="block max-w-sm text-sm font-semibold">Gremio<select value={reportGremio} onChange={(event) => setReportGremio(event.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2.5">{(tenant.gremios ?? []).map((id) => <option key={id} value={id}>{gremioLabels[id] ?? id}</option>)}</select></label>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Productos</p><p className="mt-2 text-2xl font-black">{inventoryForGremio.metrics.products ?? 0}</p></article>
+        <article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Stock crítico</p><p className="mt-2 text-2xl font-black">{inventoryForGremio.metrics.criticalStock ?? 0}</p></article>
+        <article className="rounded-2xl border bg-white p-5"><p className="text-xs uppercase tracking-wide text-zinc-500">Valor al costo registrado</p><p className="mt-2 text-2xl font-black">{money(inventoryForGremio.metrics.stockValue ?? 0)}</p></article>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {adminPlanHasFeature(currentPlan, 'a4InventoryReport') ? <button type="button" onClick={() => { try { printInventoryA4() } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo imprimir el reporte.') } }} className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white"><Printer className="h-4 w-4" />Imprimir reporte A4</button> : <UpgradeNotice feature="a4InventoryReport" currentPlan={currentPlan} />}
+        {adminPlanHasFeature(currentPlan, 'thermalInventoryReport') ? <button type="button" onClick={() => { try { printInventoryThermal(inventoryForGremio) } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo imprimir el reporte térmico.') } }} className="inline-flex items-center gap-2 rounded-xl bg-vexora-600 px-4 py-2.5 text-sm font-bold text-white"><Printer className="h-4 w-4" />Imprimir reporte térmico</button> : <UpgradeNotice feature="thermalInventoryReport" currentPlan={currentPlan} />}
+      </div>
+      <div role="region" aria-label="Lista de productos del inventario" tabIndex={0} className="max-h-[50dvh] overflow-auto overscroll-contain rounded-2xl border bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vexora-600"><table className="w-full min-w-[700px] text-left text-sm"><thead className="sticky top-0 bg-zinc-100 text-xs uppercase text-zinc-500"><tr><th className="p-3">Producto</th><th className="p-3">Categoría</th><th className="p-3">Existencia</th><th className="p-3">Costo unitario</th><th className="p-3">Valor en stock</th></tr></thead><tbody>{inventoryForGremio.products.map((product) => <tr key={product.id} className={`border-t ${product.stock <= 5 ? 'bg-amber-50' : ''}`}><td className="p-3 font-semibold">{product.name}</td><td className="p-3">{product.category}</td><td className="p-3">{product.stock} {product.unit}</td><td className="p-3">{money(product.cost)}</td><td className="p-3 font-bold">{money(product.stockValue)}</td></tr>)}{!inventoryForGremio.products.length && <tr><td colSpan="5" className="p-6 text-center text-zinc-500">No hay productos guardados para este gremio.</td></tr>}</tbody></table></div>
+      <div className="inventory-report-a4">
+        <h1>Reporte de inventario · {gremioLabels[reportGremio] ?? reportGremio}</h1>
+        <p>{tenant.business?.name ?? 'Vexora POS'} · {new Date().toLocaleString('es-CO')}</p>
+        <p>Productos: {inventoryForGremio.metrics.products ?? 0} · Stock crítico: {inventoryForGremio.metrics.criticalStock ?? 0} · Valor al costo: {money(inventoryForGremio.metrics.stockValue ?? 0)}</p>
+        <table><thead><tr><th>Producto</th><th>Categoría</th><th>Existencia</th><th>Costo unitario</th><th>Valor stock</th></tr></thead><tbody>{inventoryForGremio.products.map((product) => <tr key={product.id}><td>{product.name}</td><td>{product.category}</td><td>{product.stock} {product.unit}</td><td>{money(product.cost)}</td><td>{money(product.stockValue)}</td></tr>)}</tbody></table>
+      </div>
+    </section>}
+
+    {tab === 'cash' && <section className="mt-5 space-y-5">
+      <label className="block max-w-sm text-sm font-semibold">Gremio<select value={reportGremio} onChange={(event) => setReportGremio(event.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2.5">{(tenant.gremios ?? []).map((id) => <option key={id} value={id}>{gremioLabels[id] ?? id}</option>)}</select></label>
+      <CashRegister key={reportGremio} gremio={reportGremio || tenant.gremios?.[0]} />
     </section>}
 
     {tab === 'users' && <section className="mt-5 grid gap-5 lg:grid-cols-[1fr_1fr]">
