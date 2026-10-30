@@ -37,7 +37,7 @@ export default function MiPublicidad() {
     }
     setLoading(true)
     try {
-      const result = await apiRequest('/publicidad/me')
+      const result = await apiRequest('/api/publicidad/me')
       setCampaigns(result.anuncios ?? [])
       setFreeAvailable(Boolean(result.espacioGratisDisponible))
       setError('')
@@ -59,7 +59,7 @@ export default function MiPublicidad() {
     setError('')
     setNotice('')
     try {
-      const result = await apiRequest('/publicidad/requests', {
+      const result = await apiRequest('/api/publicidad/requests', {
         method: 'POST',
         body: JSON.stringify({
           requestId,

@@ -18,7 +18,7 @@ export function AdvertisingBanner({ enabled }) {
     let active = true
     const load = async () => {
       try {
-        const result = await apiRequest('/publicidad/feed')
+        const result = await apiRequest('/api/publicidad/feed')
         if (active) setAds(result.anuncios ?? [])
       } catch (error) {
         console.error('No se pudieron cargar los anuncios aprobados para este POS.', error)
