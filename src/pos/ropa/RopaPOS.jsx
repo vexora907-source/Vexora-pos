@@ -553,7 +553,7 @@ export default function RopaPOS() {
         {(inventoryLoading || inventoryError) && <p role={inventoryError ? 'alert' : 'status'} className={`mb-3 rounded-xl px-4 py-3 text-sm ${inventoryError ? 'bg-rose-50 text-rose-800' : 'bg-blue-50 text-blue-800'}`}>{inventoryError || 'Cargando inventario del negocio…'}</p>}
         <label className="mb-4 flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 focus-within:border-vexora-500"><Search className="h-5 w-5 text-zinc-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar prenda, categoría o SKU…" className="min-w-0 flex-1 outline-none" /></label>
         <nav aria-label="Filtrar por categoría" className="mb-4 flex flex-wrap gap-2">{categories.map((item) => <button type="button" key={item} onClick={() => setCategory(item)} aria-pressed={category === item} className={`rounded-full px-3 py-1.5 text-xs font-bold ${category === item ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-600 ring-1 ring-zinc-200'}`}>{item}</button>)}</nav>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div role="region" aria-label="Catálogo de productos" tabIndex={0} className="pos-product-catalog grid gap-4 p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vexora-500 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((product) => {
             const variants = product.variants || []
             const selected = variantFor(product)

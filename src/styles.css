@@ -31,6 +31,19 @@ button {
   cursor: pointer;
 }
 
+.pos-product-catalog {
+  max-height: min(68dvh, 680px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+@media (max-width: 640px) {
+  .pos-product-catalog {
+    max-height: min(58dvh, 520px);
+  }
+}
+
 ::selection {
   background: #fda4af;
   color: #4c0519;

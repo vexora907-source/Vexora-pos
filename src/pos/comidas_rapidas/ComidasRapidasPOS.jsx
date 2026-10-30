@@ -773,7 +773,7 @@ export default function ComidasRapidasPOS({ kitchenOnly = false }) {
                 { id: 'house', label: 'Pizza de la casa' },
               ].map((mode) => <button key={mode.id} type="button" aria-pressed={menuMode === mode.id} onClick={() => setMenuMode(mode.id)} className={`rounded-full border px-4 py-2 text-sm font-bold ${menuMode === mode.id ? 'border-orange-600 bg-orange-600 text-white' : 'border-zinc-200 bg-white text-zinc-600 hover:border-orange-300'}`}>{mode.label}</button>)}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div role="region" aria-label="Catálogo de productos" tabIndex={0} className="pos-product-catalog grid gap-3 p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 sm:grid-cols-2 xl:grid-cols-3">
               {visibleMenu.map((item) => <button key={item.id} type="button" onClick={() => openModifierDialog(item)} className="rounded-2xl border border-zinc-200 bg-white p-4 text-left transition hover:border-orange-300 hover:shadow-sm">
                 <div className="flex items-start justify-between"><span className="grid h-12 w-12 place-items-center rounded-xl bg-orange-50 text-3xl">{item.icon}</span><span className="text-sm font-black text-orange-800">{formatCOP(item.price)}</span></div>
                 <h3 className="mt-3 font-black">{item.name}</h3><p className="mt-1 text-xs leading-relaxed text-zinc-500">{item.description || item.category || 'Plato preparado en cocina'}</p>

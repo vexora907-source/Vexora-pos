@@ -5,7 +5,7 @@ const stockTone = (stock) => stock < 5 ? 'bg-amber-100 text-amber-800' : stock <
 
 export function ProductGridPapeleria({ products = [], onAdd = () => {} }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+    <div role="region" aria-label="Catálogo de productos" tabIndex={0} className="pos-product-catalog grid grid-cols-2 gap-3 p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vexora-500 sm:grid-cols-3 xl:grid-cols-4">
       {products.map((product) => <button key={product.id} type="button" onClick={() => onAdd(product)} className="rounded-2xl border border-zinc-200 bg-white p-3 text-left transition hover:border-vexora-500 hover:shadow-md">
         <div className={`grid aspect-[4/3] place-items-center rounded-xl ${product.tone}`}><span className="text-4xl" aria-hidden="true">{product.icon}</span></div>
         <div className="mt-3 flex items-start justify-between gap-1"><p className="font-bold leading-snug">{product.name}</p><PackagePlus className="mt-0.5 h-4 w-4 shrink-0 text-vexora-600" /></div>
