@@ -1,22 +1,11 @@
 import { apiRequest } from './api.js'
 import { getAuthToken } from './auth.js'
+import { getSupportIdentity } from './supportIdentity.js'
 import { isDemoMode } from './tenantStorage.js'
 
 const OUTBOX_KEY_PREFIX = 'vexora.support.outbox:'
 const HISTORY_KEY_PREFIX = 'vexora.support.history:'
-const TENANT_KEY = 'vexora.tenant'
 const MAX_OUTBOX_MESSAGES = 100
-
-function getSupportIdentity() {
-  const tenant = JSON.parse(window.localStorage.getItem(TENANT_KEY) ?? '{}')
-  const tenantId = String(tenant.id ?? tenant.tenantId ?? '').trim()
-  const businessName = String(tenant.business?.name ?? tenant.business?.email ?? '').trim()
-  const userId = String(tenant.user?.id ?? '').trim()
-  if (!tenantId || !businessName || !userId) {
-    throw new Error('No se pudo identificar tu negocio y usuario para abrir soporte.')
-  }
-  return { tenantId, businessName, userId, senderName: tenant.user?.name || tenant.user?.email || 'Usuario POS' }
-}
 
 function outboxKey(tenantId, userId) {
   return `${OUTBOX_KEY_PREFIX}${tenantId}:${userId}`
