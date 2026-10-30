@@ -32,7 +32,8 @@ button {
 }
 
 .pos-product-catalog {
-  max-height: min(68dvh, 680px);
+  max-height: min(40dvh, 420px);
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -40,7 +41,7 @@ button {
 
 @media (max-width: 640px) {
   .pos-product-catalog {
-    max-height: min(58dvh, 520px);
+    max-height: min(34dvh, 280px);
   }
 }
 
