@@ -48,6 +48,19 @@ export function getSalesReport(from, to) {
   return apiRequest(`/api/admin/sales?${params}`)
 }
 
+export function getInventoryReport(gremio) {
+  return apiRequest(`/api/admin/inventory/${encodeURIComponent(gremio)}/report`)
+}
+
+export function getAccountingReport(from, to) {
+  const params = new URLSearchParams({ from, to })
+  return apiRequest(`/api/admin/accounting?${params}`)
+}
+
+export function createExpense(input) {
+  return apiRequest('/api/admin/expenses', { method: 'POST', body: JSON.stringify(input) })
+}
+
 export function getAdminLicenses() {
   return apiRequest('/api/admin/licenses')
 }
