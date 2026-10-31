@@ -1,11 +1,26 @@
 import { apiRequest } from './api.js'
 
+export function sanitizeBusinessConfig(config) {
+  if (!Array.isArray(config?.pagos)) return config
+  return {
+    ...config,
+    pagos: config.pagos.map((payment) => {
+      const sanitizedPayment = { ...payment }
+      delete sanitizedPayment._id
+      return sanitizedPayment
+    }),
+  }
+}
+
 export function getBusinessConfig(gremio) {
   return apiRequest(`/api/admin/config/${encodeURIComponent(gremio)}`)
 }
 
 export function saveBusinessConfig(gremio, config) {
-  return apiRequest(`/api/admin/config/${encodeURIComponent(gremio)}`, { method: 'PUT', body: JSON.stringify(config) })
+  return apiRequest(`/api/admin/config/${encodeURIComponent(gremio)}`, {
+    method: 'PUT',
+    body: JSON.stringify(sanitizeBusinessConfig(config)),
+  })
 }
 
 export function getAdminUsers() {
