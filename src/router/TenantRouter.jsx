@@ -222,7 +222,7 @@ export default function TenantRouter() {
   if (cashLoading && ['/pos', '/pos/admin', '/admin', '/dashboard', '/configuracion'].includes(path)) {
     return <main className="grid min-h-screen place-items-center bg-zinc-50 p-6"><p role="status" className="rounded-2xl border bg-white p-5 text-sm font-semibold text-zinc-700">Cargando los datos guardados de este negocio…</p></main>
   }
-  if (path === '/admin' || path === '/dashboard') return canAdmin ? <Admin /> : <Login />
+  if (path === '/admin' || path === '/dashboard' || path === '/pos/admin') return canAdmin ? <Admin /> : <Login />
   if (path === '/configuracion') return canAdmin ? <Configuration /> : <Login />
   const mustCheckLicense = path === '/pos' && !tenant.isDemo && Boolean(API_URL && window.localStorage.getItem('vexora.accessToken'))
   if (mustCheckLicense && (licenseState.checking || (!licenseState.status && !licenseState.error) || licenseState.error || licenseState.status?.blocked)) {
@@ -267,7 +267,7 @@ export default function TenantRouter() {
           }
         }} />}
       </div>}
-      {canAdmin && <div className="mx-auto flex max-w-[1500px] gap-2 px-4 pt-3 sm:px-6"><a href="/admin" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-vexora-500">Panel administrativo</a><a href="/configuracion" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-vexora-500">Configuración</a></div>}
+      {canAdmin && <div className="mx-auto flex max-w-[1500px] gap-2 px-4 pt-3 sm:px-6"><a href="/pos/admin" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-vexora-500">Panel administrativo</a><a href="/configuracion" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-vexora-500">Configuración</a></div>}
       {role !== 'COCINA' && <div className="mx-auto max-w-[1500px] px-4 pt-4 sm:px-6"><DianStatus dian={tenant.dian} /></div>}
       {role !== 'COCINA' && <nav aria-label="Secciones del negocio" className="mx-auto mt-4 flex max-w-[1500px] gap-2 px-4 sm:px-6">
         <button type="button" aria-pressed={posSection === 'sales'} onClick={() => setPosSection('sales')} className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${posSection === 'sales' ? 'bg-vexora-600 text-white' : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-100'}`}><ShoppingBag className="h-4 w-4" />Punto de venta</button>
