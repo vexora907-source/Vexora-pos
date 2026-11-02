@@ -15,7 +15,7 @@ export function InventoryManager({ title = 'Inventario', gremio, products, onAdd
   const [selectedRecipeIds, setSelectedRecipeIds] = useState([])
   const [selectedModifierIds, setSelectedModifierIds] = useState([])
   const [editingId, setEditingId] = useState('')
-  const [draft, setDraft] = useState({ name: '', category: '', barcode: '', price: '', quantity: '' })
+  const [draft, setDraft] = useState({ name: '', category: '', barcode: '', price: '', cost: '', quantity: '' })
   const supportsGranel = gremio === 'tienda'
   const supportsUnits = supportsGranel || gremio === 'comidas_rapidas'
   const supportsRecipes = gremio === 'comidas_rapidas'
@@ -28,6 +28,7 @@ export function InventoryManager({ title = 'Inventario', gremio, products, onAdd
     const form = new FormData(formElement)
     const name = String(form.get('name')).trim()
     const price = Number(form.get('price'))
+    const cost = Number(form.get('cost'))
     const quantity = isMenuItem ? 0 : Number(form.get('quantity'))
     const recipeIngredients = products
       .filter((product) => selectedRecipeIds.includes(product.id))
@@ -48,8 +49,8 @@ export function InventoryManager({ title = 'Inventario', gremio, products, onAdd
           unit: product.unit || 'unidad',
         }],
       }))
-    if (!name || !Number.isFinite(price) || price < 0 || !Number.isFinite(quantity) || quantity < 0 || (!isGranel && !isMenuItem && !Number.isInteger(quantity))) {
-      setError('Revisa el nombre, precio y cantidad del producto.')
+    if (!name || !Number.isFinite(price) || price < 0 || !Number.isFinite(cost) || cost < 0 || !Number.isFinite(quantity) || quantity < 0 || (!isGranel && !isMenuItem && !Number.isInteger(quantity))) {
+      setError('Revisa el nombre, precio de venta, precio proveedor y cantidad del producto.')
       return
     }
     if (isMenuItem && (!recipeIngredients.length || recipeIngredients.some((ingredient) => !Number.isFinite(ingredient.quantity) || ingredient.quantity <= 0))) {
@@ -66,6 +67,7 @@ export function InventoryManager({ title = 'Inventario', gremio, products, onAdd
         category: String(form.get('category')).trim() || 'General',
         barcode: String(form.get('barcode')).trim(),
         price,
+        cost,
         quantity,
         icon: selectedIcon === 'auto' ? getProductIcon(gremio, name, String(form.get('category'))) : selectedIcon,
         tone: 'bg-vexora-50',
@@ -113,6 +115,7 @@ export function InventoryManager({ title = 'Inventario', gremio, products, onAdd
       category: product.category ?? '',
       barcode: product.barcode ?? '',
       price: String(product.price),
+      cost: String(product.cost ?? 0),
       quantity: String(product.quantity ?? product.stock ?? 0),
     })
     setError('')
@@ -123,9 +126,10 @@ export function InventoryManager({ title = 'Inventario', gremio, products, onAdd
     const current = products.find((product) => product.id === editingId)
     if (!current) return
     const price = Number(draft.price)
+    const cost = Number(draft.cost)
     const quantity = Number(draft.quantity)
-    if (!draft.name.trim() || !Number.isFinite(price) || price < 0 || !Number.isFinite(quantity) || quantity < 0) {
-      setError('Revisa el nombre, precio y cantidad del producto.')
+    if (!draft.name.trim() || !Number.isFinite(price) || price < 0 || !Number.isFinite(cost) || cost < 0 || !Number.isFinite(quantity) || quantity < 0) {
+      setError('Revisa el nombre, precio de venta, precio proveedor y cantidad del producto.')
       return
     }
     if (!fractionalFor(current) && !Number.isInteger(quantity)) {
@@ -138,6 +142,7 @@ export function InventoryManager({ title = 'Inventario', gremio, products, onAdd
         category: draft.category.trim() || 'General',
         barcode: draft.barcode.trim(),
         price,
+        cost,
         quantity,
         stock: quantity,
       })
@@ -190,6 +195,7 @@ export function InventoryManager({ title = 'Inventario', gremio, products, onAdd
           <label className="text-xs font-bold text-zinc-600">Categoría<input name="category" maxLength="60" value={category} onChange={(event) => setCategory(event.target.value)} placeholder="General" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-sm font-normal" /></label>
           <label className="text-xs font-bold text-zinc-600">Código<input name="barcode" maxLength="60" placeholder="Opcional" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-sm font-normal" /></label>
           <label className="text-xs font-bold text-zinc-600">Precio<input name="price" required type="number" min="0" step="1" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-sm font-normal" /></label>
+          <label className="text-xs font-bold text-zinc-600">Precio proveedor<input name="cost" type="number" min="0" step="1" defaultValue="0" className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-sm font-normal" /></label>
           {!isMenuItem && <label className="text-xs font-bold text-zinc-600">Cantidad inicial<input name="quantity" required type="number" min="0" step={isGranel ? '0.01' : '1'} className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-sm font-normal" /></label>}
           <label className="text-xs font-bold text-zinc-600">Ícono<select value={selectedIcon} onChange={(event) => setSelectedIcon(event.target.value)} className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="auto">{suggestedIcon} Sugerido</option>{iconOptions.map((icon) => <option key={icon} value={icon}>{icon}</option>)}</select></label>
           {supportsRecipes && <label className="flex items-center gap-2 rounded-xl bg-orange-50 p-3 text-xs font-bold text-orange-950 sm:col-span-2 lg:col-span-4"><input type="checkbox" checked={isMenuItem} onChange={(event) => { setIsMenuItem(event.target.checked); setSelectedRecipeIds([]); setSelectedModifierIds([]) }} />Es un plato vendible del menú con receta</label>}
@@ -226,9 +232,9 @@ export function InventoryManager({ title = 'Inventario', gremio, products, onAdd
               const restockAmount = Number(restock[product.id])
               const isRecipe = Array.isArray(product.ingredients) && product.ingredients.length > 0
               return <div key={product.id} className="px-4 py-3">
-                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-zinc-100 text-2xl">{product.icon || getProductIcon(gremio, product.name, product.category)}</span><div className="min-w-0"><p className="truncate text-sm font-bold">{product.name}{(product.active === false || product.activo === 'NO') && <span className="ml-2 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">Inactivo</span>}{product.isDailyMenu && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">Menú del día</span>}{isRecipe && <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-900">Plato de menú</span>}</p><p className="text-xs text-zinc-500">{product.category || 'General'}{product.barcode ? ` · ${product.barcode}` : ''} · {formatCOP(product.price)}{product.expiryDate ? ` · vence ${new Date(product.expiryDate).toLocaleDateString('es-CO')}` : ''}</p>{!isRecipe && <div className="mt-2 flex items-center gap-2"><input aria-label={`Cantidad a cargar para ${product.name}`} type="number" min={fractional ? '0.01' : '1'} step={fractional ? '0.01' : '1'} value={restock[product.id] ?? ''} onChange={(event) => setRestock((current) => ({ ...current, [product.id]: event.target.value }))} placeholder={fractional ? 'Cantidad' : 'Unidades'} className="w-24 rounded-md border border-zinc-200 px-2 py-1 text-xs" /><button type="button" disabled={!Number.isFinite(restockAmount) || restockAmount < (fractional ? 0.01 : 1) || (!fractional && !Number.isInteger(restockAmount))} onClick={() => void restockProduct(product.id, restockAmount)} className="rounded-md bg-vexora-50 px-2 py-1 text-xs font-bold text-vexora-700 disabled:opacity-40">Cargar stock</button></div>}</div><span className={`rounded-lg px-2.5 py-1.5 text-xs font-black ${Number(product.quantity ?? product.stock) <= 5 ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}>{isRecipe ? 'Receta' : `${product.quantity ?? product.stock} ${product.unit || 'und.'}`}</span></div>
+                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-zinc-100 text-2xl">{product.icon || getProductIcon(gremio, product.name, product.category)}</span><div className="min-w-0"><p className="truncate text-sm font-bold">{product.name}{(product.active === false || product.activo === 'NO') && <span className="ml-2 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">Inactivo</span>}{product.isDailyMenu && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">Menú del día</span>}{isRecipe && <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-900">Plato de menú</span>}</p><p className="text-xs text-zinc-500">{product.category || 'General'}{product.barcode ? ` · ${product.barcode}` : ''} · Venta: {formatCOP(product.price)} · Proveedor: {formatCOP(product.cost ?? 0)}{product.expiryDate ? ` · vence ${new Date(product.expiryDate).toLocaleDateString('es-CO')}` : ''}</p>{!isRecipe && <div className="mt-2 flex items-center gap-2"><input aria-label={`Cantidad a cargar para ${product.name}`} type="number" min={fractional ? '0.01' : '1'} step={fractional ? '0.01' : '1'} value={restock[product.id] ?? ''} onChange={(event) => setRestock((current) => ({ ...current, [product.id]: event.target.value }))} placeholder={fractional ? 'Cantidad' : 'Unidades'} className="w-24 rounded-md border border-zinc-200 px-2 py-1 text-xs" /><button type="button" disabled={!Number.isFinite(restockAmount) || restockAmount < (fractional ? 0.01 : 1) || (!fractional && !Number.isInteger(restockAmount))} onClick={() => void restockProduct(product.id, restockAmount)} className="rounded-md bg-vexora-50 px-2 py-1 text-xs font-bold text-vexora-700 disabled:opacity-40">Cargar stock</button></div>}</div><span className={`rounded-lg px-2.5 py-1.5 text-xs font-black ${Number(product.quantity ?? product.stock) <= 5 ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}>{isRecipe ? 'Receta' : `${product.quantity ?? product.stock} ${product.unit || 'und.'}`}</span></div>
                 <div className="mt-2 flex gap-2"><button type="button" onClick={() => startEditing(product)} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold"><Pencil className="h-3 w-3" />Editar</button><button type="button" onClick={() => void removeProduct(product)} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-bold text-rose-700"><Trash2 className="h-3 w-3" />Eliminar</button></div>
-                {editingId === product.id && <form onSubmit={saveProduct} className="mt-3 grid gap-2 rounded-xl bg-zinc-50 p-3 sm:grid-cols-2"><label className="text-xs font-semibold">Nombre<input required maxLength="100" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-2" /></label><label className="text-xs font-semibold">Categoría<input maxLength="60" value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-2" /></label><label className="text-xs font-semibold">Código<input maxLength="60" value={draft.barcode} onChange={(event) => setDraft((current) => ({ ...current, barcode: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-2" /></label><label className="text-xs font-semibold">Precio<input required type="number" min="0" step="1" value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-2" /></label><label className="text-xs font-semibold">Cantidad<input required type="number" min="0" step={fractionalFor(product) ? '0.01' : '1'} value={draft.quantity} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-2" /></label><div className="flex items-end gap-2"><button className="inline-flex items-center gap-1 rounded-lg bg-vexora-600 px-3 py-2 text-xs font-bold text-white"><Save className="h-3.5 w-3.5" />Guardar</button><button type="button" onClick={() => setEditingId('')} className="rounded-lg border bg-white px-3 py-2 text-xs font-bold">Cancelar</button></div></form>}
+                {editingId === product.id && <form onSubmit={saveProduct} className="mt-3 grid gap-2 rounded-xl bg-zinc-50 p-3 sm:grid-cols-2"><label className="text-xs font-semibold">Nombre<input required maxLength="100" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-2" /></label><label className="text-xs font-semibold">Categoría<input maxLength="60" value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-2" /></label><label className="text-xs font-semibold">Código<input maxLength="60" value={draft.barcode} onChange={(event) => setDraft((current) => ({ ...current, barcode: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-2" /></label><label className="text-xs font-semibold">Precio de venta<input required type="number" min="0" step="1" value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-2" /></label><label className="text-xs font-semibold">Precio proveedor<input type="number" min="0" step="1" value={draft.cost} onChange={(event) => setDraft((current) => ({ ...current, cost: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-2" /></label><label className="text-xs font-semibold">Cantidad<input required type="number" min="0" step={fractionalFor(product) ? '0.01' : '1'} value={draft.quantity} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-2" /></label><div className="flex items-end gap-2"><button className="inline-flex items-center gap-1 rounded-lg bg-vexora-600 px-3 py-2 text-xs font-bold text-white"><Save className="h-3.5 w-3.5" />Guardar</button><button type="button" onClick={() => setEditingId('')} className="rounded-lg border bg-white px-3 py-2 text-xs font-bold">Cancelar</button></div></form>}
               </div>
             }) : <p className="p-8 text-center text-sm text-zinc-500">Todavía no hay productos. Usa el formulario para cargar inventario.</p>}
           </div>
