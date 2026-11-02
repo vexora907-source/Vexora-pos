@@ -17,6 +17,7 @@ export default function Login() {
       const result = await login(String(form.get('email')).trim(), String(form.get('password')))
       const tenant = result.tenant
       saveTenant({
+        id: tenant.id ?? tenant._id,
         business: {
           name: tenant.name,
           owner: tenant.ownerName,

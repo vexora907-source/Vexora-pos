@@ -17,6 +17,7 @@ export function printUniversalTicket(ticket, target) {
 
   const business = ticket.negocio ?? {}
   const isCashClosure = ticket.tipo === 'CIERRE'
+  const isInventoryReport = ticket.tipo === 'INVENTARIO'
   const date = new Date(ticket.createdAt ?? Date.now()).toLocaleString('es-CO')
   const copyLabel = ticket.copy ? '<div class="ticket-center"><strong>*** COPIA ***</strong></div>' : ''
   const codeBlock = ticket.codeImage
@@ -38,6 +39,11 @@ export function printUniversalTicket(ticket, target) {
       <div class="ticket-rule"></div>
       <strong>DESGLOSE DE EFECTIVO</strong>
       ${(ticket.desglose ?? []).map((row) => `<div class="ticket-item"><span>${escapeHtml(`${row.label} × ${row.cantidad}`)}</span><span>${escapeHtml(row.total)}</span></div>`).join('') || '<div>Sin efectivo contado</div>'}
+    ` : isInventoryReport ? `
+      <div class="ticket-center"><strong>REPORTE DE INVENTARIO</strong></div>
+      <div>Gremio: ${escapeHtml(ticket.gremio || 'Negocio')}</div>
+      <div>Productos: ${escapeHtml(ticket.productos?.length ?? 0)}</div>
+      <div class="ticket-rule"></div>
     ` : target === 'caja' ? `
     <div class="ticket-rule"></div>
     <div>Factura: ${escapeHtml(ticket.numero || 'Venta')}</div>
@@ -45,6 +51,8 @@ export function printUniversalTicket(ticket, target) {
   ` : `<div class="ticket-center">COMANDA · ${escapeHtml(ticket.numero || 'Cocina')}</div>`
     const total = isCashClosure
       ? `<div class="ticket-total">${escapeHtml(ticket.resultado || 'CIERRE')}</div>`
+      : isInventoryReport && ticket.total !== undefined
+        ? `<div class="ticket-total">VALOR: ${escapeHtml(formatCOP(Number(ticket.total)))}</div>`
       : target === 'caja' && ticket.total !== undefined
     ? `<div class="ticket-total">TOTAL: ${escapeHtml(formatCOP(Number(ticket.total)))}</div>`
     : ''

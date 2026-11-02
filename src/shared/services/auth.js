@@ -24,8 +24,7 @@ export function clearAuthToken() {
 function mapDuplicateEmailError(error) {
   const message = String(error?.message ?? '').toLowerCase()
   if (
-    error?.status === 409
-    || /ya existe una cuenta con este correo|ya existe.*correo|email already exists|user already exists|account.*already exists/i.test(message)
+    /ya existe una cuenta con este correo|ya existe.*correo|email already exists|user already exists|account.*already exists/i.test(message)
   ) {
     throw new Error(DUPLICATE_EMAIL_MESSAGE)
   }

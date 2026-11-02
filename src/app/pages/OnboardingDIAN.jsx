@@ -10,6 +10,7 @@ export default function OnboardingDIAN() {
   const tenant = useTenantGremio()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const duplicateEmail = /ya existe una cuenta con este correo|ya existe.*correo|email already exists|user already exists|account.*already exists/i.test(error)
 
   async function finishRegistration() {
     setBusy(true)
@@ -44,6 +45,7 @@ export default function OnboardingDIAN() {
           dianTaxRegime: draft.dianTaxRegime,
         })
         saveTenant({
+          id: result.tenant.id ?? result.tenant._id,
           business: {
             name: result.tenant.name,
             owner: result.tenant.ownerName,
@@ -78,7 +80,13 @@ export default function OnboardingDIAN() {
         <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5">
           <h2 className="font-bold">Durante la prueba</h2>
           <p className="mt-2 text-sm text-zinc-600">Puedes vender y explorar tu gremio. La facturación DIAN se configura al elegir un plan que la incluya y no se emitirán facturas DIAN durante la prueba.</p>
-          {error && <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
+          {error && <div role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
+            <p>{error}</p>
+            {duplicateEmail && <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 font-semibold">
+              <a href="/login" className="underline">Iniciar sesión en tu cuenta</a>
+              <a href="/recuperar-contrasena" className="underline">Recuperar contraseña</a>
+            </div>}
+          </div>}
           <button type="button" disabled={busy} onClick={() => void finishRegistration()} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-vexora-600 px-5 py-4 font-bold text-white hover:bg-vexora-700 disabled:opacity-50">{busy ? 'Creando cuenta…' : 'Iniciar mis 15 días gratis'} <ArrowRight className="h-5 w-5" /></button>
         </section>
         <p className="mt-5 flex items-center justify-center gap-2 text-center text-xs text-zinc-400"><Check className="h-4 w-4" />{tenant.gremios.length} gremio(s) seleccionados: {tenant.gremios.join(', ') || 'ninguno'}</p>

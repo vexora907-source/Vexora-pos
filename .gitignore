@@ -12,3 +12,5 @@
 .DS_Store
 
 /vexora-print-host/config.json
+.vercel
+.env*

@@ -96,6 +96,19 @@ test('prints a cash closure summary and denomination breakdown', () => {
   assert.match(ticket.innerHTML, /CAJA CUADRADA/)
 })
 
+test('prints an inventory report with stock and total value', () => {
+  printUniversalTicket({
+    tipo: 'INVENTARIO',
+    gremio: 'Papelería',
+    productos: [{ nombre: 'Cuaderno', cantidad: 4, total: 12000 }],
+    total: 12000,
+  }, 'caja')
+  assert.match(bodyNodes.at(-1).innerHTML, /REPORTE DE INVENTARIO/)
+  assert.match(bodyNodes.at(-1).innerHTML, /Papelería/)
+  assert.match(bodyNodes.at(-1).innerHTML, /Cuaderno/)
+  assert.match(bodyNodes.at(-1).innerHTML, /VALOR:/)
+})
+
 test('marks a reprinted ticket as a copy', () => {
   printUniversalTicket({ copy: true, numero: 'T-3', productos: [] }, 'caja')
   assert.match(bodyNodes.at(-1).innerHTML, /\*\*\* COPIA \*\*\*/)
