@@ -113,3 +113,15 @@ test('marks a reprinted ticket as a copy', () => {
   printUniversalTicket({ copy: true, numero: 'T-3', productos: [] }, 'caja')
   assert.match(bodyNodes.at(-1).innerHTML, /\*\*\* COPIA \*\*\*/)
 })
+
+test('includes the saved business logo in the printable thermal ticket', () => {
+  printUniversalTicket({
+    negocio: {
+      nombre: 'Mi negocio',
+      logo: 'https://example.test/logo.png',
+      logoPrintImage: 'data:image/png;base64,abc',
+    },
+    productos: [],
+  }, 'caja')
+  assert.match(bodyNodes.at(-1).innerHTML, /<img src="data:image\/png;base64,abc"/)
+})

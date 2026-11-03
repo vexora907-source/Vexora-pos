@@ -17,6 +17,67 @@ function command(...bytes) {
   return new Uint8Array(bytes)
 }
 
+async function rasterizeLogo(source) {
+  const image = new Image()
+  image.crossOrigin = 'anonymous'
+  image.src = source
+  try {
+    await image.decode()
+  } catch {
+    throw new Error('No se pudo cargar el logo para la impresora. Verifica que la URL de la imagen permita acceso desde Vexora.')
+  }
+  if (!image.naturalWidth || !image.naturalHeight) {
+    throw new Error('El logo guardado no contiene una imagen imprimible.')
+  }
+
+  const scale = Math.min(1, 384 / image.naturalWidth, 120 / image.naturalHeight)
+  const width = Math.max(1, Math.round(image.naturalWidth * scale))
+  const height = Math.max(1, Math.round(image.naturalHeight * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (!context) throw new Error('El navegador no pudo preparar el logo para la impresora.')
+  context.fillStyle = '#fff'
+  context.fillRect(0, 0, width, height)
+  context.drawImage(image, 0, 0, width, height)
+
+  let pixels
+  try {
+    pixels = context.getImageData(0, 0, width, height).data
+  } catch {
+    throw new Error('La imagen del logo no permite conversión para impresión. Usa una imagen del mismo sitio o habilita CORS en su servidor.')
+  }
+  const rowBytes = Math.ceil(width / 8)
+  const bitmap = new Uint8Array(rowBytes * height)
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const pixel = (y * width + x) * 4
+      const luminance = pixels[pixel] * 0.299 + pixels[pixel + 1] * 0.587 + pixels[pixel + 2] * 0.114
+      if (luminance < 160) bitmap[y * rowBytes + Math.floor(x / 8)] |= 0x80 >> (x % 8)
+    }
+  }
+  return {
+    width,
+    height,
+    data: btoa(String.fromCharCode(...bitmap)),
+    printImage: canvas.toDataURL('image/png'),
+  }
+}
+
+async function preparePrintableTicket(gremio, target, ticket) {
+  const prepared = await prepareTicketForPrinting(gremio, ticket)
+  if (target === 'caja' && prepared.negocio?.logo) {
+    const raster = await rasterizeLogo(prepared.negocio.logo)
+    prepared.negocio = {
+      ...prepared.negocio,
+      logoRaster: { width: raster.width, height: raster.height, data: raster.data },
+      logoPrintImage: raster.printImage,
+    }
+  }
+  return prepared
+}
+
 function qrCommands(value) {
   if (!value) return []
   const data = encoder.encode(String(value))
@@ -33,7 +94,7 @@ function qrCommands(value) {
 }
 
 function barcodeCommands(value) {
-  if (!/^\d{12}$/.test(String(value ?? ''))) return [escPosText('Codigo de barras no disponible: falta consecutivo de 12 digitos.')]
+  if (typeof value !== 'string' || !/^\d{12}$/.test(value)) return [escPosText('Codigo de barras no disponible: falta consecutivo de 12 digitos.')]
   const data = encoder.encode(`{B${value}`)
   return [
     command(0x1d, 0x48, 0x02),
@@ -45,10 +106,29 @@ function barcodeCommands(value) {
   ]
 }
 
+function logoCommands(logoRaster) {
+  if (!logoRaster) return []
+  const width = Number(logoRaster.width)
+  const height = Number(logoRaster.height)
+  if (!Number.isInteger(width) || width < 1 || width > 384 || !Number.isInteger(height) || height < 1 || height > 120) {
+    throw new Error('Las dimensiones del logo no son válidas para impresión térmica.')
+  }
+  const rowBytes = Math.ceil(width / 8)
+  const binary = atob(logoRaster.data)
+  if (binary.length !== rowBytes * height) throw new Error('Los datos del logo están incompletos para impresión térmica.')
+  const bitmap = Uint8Array.from(binary, (character) => character.charCodeAt(0))
+  return [
+    command(0x1d, 0x76, 0x30, 0x00, rowBytes & 0xff, rowBytes >> 8, height & 0xff, height >> 8),
+    bitmap,
+    command(0x0a),
+  ]
+}
+
 function makeReceiptBytes(ticket, target) {
   const bytes = [
     command(0x1b, 0x40),
     command(0x1b, 0x61, 0x01),
+    ...(target === 'caja' ? logoCommands(ticket.negocio?.logoRaster) : []),
     command(0x1b, 0x45, 0x01),
     escPosText(ticket.negocio?.nombre || 'VEXORA POS'),
     command(0x1b, 0x45, 0x00),
@@ -243,7 +323,7 @@ export async function printConfiguredUsbTicket(gremio, target, ticket) {
   const printers = await getPrinterConfig(gremio)
   const printer = printers?.[target]
   if (!printer?.imprimirAutomaticamente || printer.tipo !== 'usb') return false
-  const printableTicket = target === 'caja' ? await prepareTicketForPrinting(gremio, ticket) : ticket
+  const printableTicket = await preparePrintableTicket(gremio, target, ticket)
   await printUsb(printableTicket, target)
   return true
 }
@@ -252,15 +332,17 @@ export async function printConfiguredTicket(gremio, target, ticket) {
   const printers = await getPrinterConfig(gremio)
   const printer = printers?.[target]
   if (!printer?.imprimirAutomaticamente) return false
-  const printableTicket = target === 'caja' ? await prepareTicketForPrinting(gremio, ticket) : ticket
+  const printableTicket = await preparePrintableTicket(gremio, target, ticket)
   if (printer.tipo === 'usb') {
     await printUsb(printableTicket, target)
     return true
   }
   if (isDemoMode()) throw new Error('La demo no se conecta a impresoras de red ni al backend.')
+  const { codeImage: _codeImage, negocio, ...networkTicket } = printableTicket
+  const { logoPrintImage: _logoPrintImage, ...networkBusiness } = negocio ?? {}
   const result = await apiRequest(`/api/printers/${encodeURIComponent(gremio)}/print/${target}`, {
     method: 'POST',
-    body: JSON.stringify({ ticket: printableTicket, automatic: true }),
+    body: JSON.stringify({ ticket: { ...networkTicket, ...(negocio ? { negocio: networkBusiness } : {}) }, automatic: true }),
   })
   return result?.skipped !== true
 }
@@ -268,12 +350,14 @@ export async function printConfiguredTicket(gremio, target, ticket) {
 export async function printReceipt(gremio, ticket, { requestDevice = true } = {}) {
   const printers = await getPrinterConfig(gremio)
   const printer = printers?.caja
-  const printableTicket = await prepareTicketForPrinting(gremio, ticket)
+  const printableTicket = await preparePrintableTicket(gremio, 'caja', ticket)
   if (printer?.tipo === 'red') {
     if (isDemoMode()) throw new Error('La demo no se conecta a impresoras de red ni al backend.')
+    const { codeImage: _codeImage, negocio, ...networkTicket } = printableTicket
+    const { logoPrintImage: _logoPrintImage, ...networkBusiness } = negocio ?? {}
     await apiRequest(`/api/printers/${encodeURIComponent(gremio)}/print/caja`, {
       method: 'POST',
-      body: JSON.stringify({ ticket: printableTicket, automatic: false }),
+      body: JSON.stringify({ ticket: { ...networkTicket, ...(negocio ? { negocio: networkBusiness } : {}) }, automatic: false }),
     })
     return
   }

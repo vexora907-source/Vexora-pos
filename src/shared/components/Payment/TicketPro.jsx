@@ -15,7 +15,8 @@ export default function TicketPro({ datos = {}, tipoCodigo = 'QR' }) {
   const business = datos.negocio ?? {}
   const customer = datos.customer ?? datos.cliente ?? {}
   const items = datos.items ?? datos.productos ?? []
-  const barcode = String(datos.barcode12 ?? datos.facturaCodigo12 ?? datos.ticketCode12 ?? '').replace(/\D/g, '')
+  const rawBarcode = datos.barcode12 ?? ''
+  const barcode = typeof rawBarcode === 'string' && BARCODE_PATTERN.test(rawBarcode) ? rawBarcode : ''
   const qrValue = String(datos.qrValue ?? datos.verificationUrl ?? datos.qrUrl ?? datos.saleKey ?? datos.numero ?? '')
   const total = Number(datos.total ?? items.reduce((sum, item) => sum + (Number(item.price ?? item.precio) || 0) * (Number(item.quantity ?? item.cantidad) || 0), 0))
 

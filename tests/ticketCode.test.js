@@ -17,4 +17,13 @@ test('accepts only a backend-provided 12 digit barcode', () => {
 
   const missing = prepareTicketCode({ numero: 'sale-456' }, { tipoCodigo: 'BARCODE' })
   assert.equal(missing.barcode12, '')
+
+  const malformed = prepareTicketCode({ barcode12: '750000010234-extra' }, { tipoCodigo: 'BARCODE' })
+  assert.equal(malformed.barcode12, '')
+
+  const numeric = prepareTicketCode({ barcode12: 750000010234 }, { tipoCodigo: 'BARCODE' })
+  assert.equal(numeric.barcode12, '')
+
+  const legacyAlias = prepareTicketCode({ facturaCodigo12: '750000010234' }, { tipoCodigo: 'BARCODE' })
+  assert.equal(legacyAlias.barcode12, '')
 })

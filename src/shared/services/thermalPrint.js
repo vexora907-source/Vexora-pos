@@ -19,6 +19,9 @@ export function printUniversalTicket(ticket, target) {
   const isCashClosure = ticket.tipo === 'CIERRE'
   const isInventoryReport = ticket.tipo === 'INVENTARIO'
   const date = new Date(ticket.createdAt ?? Date.now()).toLocaleString('es-CO')
+  const logo = business.logo
+    ? `<img src="${escapeHtml(business.logoPrintImage || business.logo)}" alt="Logo de ${escapeHtml(business.nombre || 'negocio')}" style="display:block;margin:0 auto 8px;max-width:180px;max-height:80px;object-fit:contain" />`
+    : ''
   const copyLabel = ticket.copy ? '<div class="ticket-center"><strong>*** COPIA ***</strong></div>' : ''
   const codeBlock = ticket.codeImage
     ? `<div class="ticket-center"><img src="${escapeHtml(ticket.codeImage)}" alt="${ticket.tipoCodigo === 'BARCODE' ? 'Código de barras' : 'Código QR'}" style="max-width:100%;max-height:150px" /></div>`
@@ -66,6 +69,7 @@ export function printUniversalTicket(ticket, target) {
   printRoot.setAttribute('aria-label', 'Ticket térmico')
   printRoot.innerHTML = `
     <header class="ticket-center">
+      ${logo}
       <strong>${escapeHtml(business.nombre || 'VEXORA POS')}</strong>
       ${business.nit ? `<div>NIT: ${escapeHtml(business.nit)}</div>` : ''}
       ${business.direccion ? `<div>${escapeHtml(business.direccion)}</div>` : ''}

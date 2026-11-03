@@ -20,14 +20,14 @@ export async function getTicketCodeSettings(gremio) {
 
 export function prepareTicketCode(ticket, settings = {}) {
   const tipoCodigo = settings.tipoCodigo === 'BARCODE' ? 'BARCODE' : 'QR'
-  const rawBarcode = ticket.barcode12 ?? ticket.facturaCodigo12 ?? ticket.ticketCode12 ?? ''
-  const barcode12 = String(rawBarcode).replace(/\D/g, '')
+  const rawBarcode = ticket.barcode12 ?? ''
+  const barcode12 = typeof rawBarcode === 'string' && BARCODE_PATTERN.test(rawBarcode) ? rawBarcode : ''
   const qrValue = String(ticket.verificationUrl ?? ticket.qrUrl ?? ticket.saleKey ?? ticket.numero ?? '')
 
   return {
     ...ticket,
     tipoCodigo,
-    barcode12: BARCODE_PATTERN.test(barcode12) ? barcode12 : '',
+    barcode12,
     qrValue,
   }
 }
