@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Building2, CalendarClock, CircleDollarSign, Cpu, FileText, KeyRound, LockKeyhole, QrCode, Save, Wallet } from 'lucide-react'
-import { getBusinessConfig, saveBusinessConfig } from '../../shared/services/admin.js'
+import { ArrowLeft, Building2, CalendarClock, CircleDollarSign, Cpu, FileText, KeyRound, Layers, LockKeyhole, QrCode, Save, Wallet } from 'lucide-react'
+import { getBusinessConfig, saveBusinessConfig, updateOwnTenantGremios } from '../../shared/services/admin.js'
 import { API_URL } from '../../shared/services/api.js'
 import { printPrinterTest } from '../../shared/services/printers.js'
 import { getAuthToken } from '../../shared/services/auth.js'
@@ -10,6 +10,7 @@ import { configureDian, getDianConfiguration, syncDianNumberings } from '../../s
 import { useTenantGremio } from '../../shared/hooks/useTenantGremio.js'
 import { DianConfig } from '../../shared/components/DianModule/DianConfig.jsx'
 import { TutorialGremio } from '../components/TutorialGremio.jsx'
+import { GREMIOS } from '../components/GremioSelector.jsx'
 
 const STORAGE_KEY = 'vexora.business.config'
 const DENOMINATIONS = [1000, 2000, 5000, 10000, 20000, 50000, 100000]
@@ -42,6 +43,7 @@ const TABS = [
   { id: 'hardware', label: 'Impresoras y hardware', icon: Cpu },
   { id: 'impuestos', label: 'Impuestos', icon: FileText },
   { id: 'ticket', label: 'Ticket', icon: QrCode },
+  { id: 'gremios', label: 'Gremios del negocio', icon: Layers },
   { id: 'pagos', label: 'Métodos de pago', icon: Wallet },
   { id: 'licencia', label: 'Licencia', icon: KeyRound },
   { id: 'seguridad', label: 'Usuarios y seguridad', icon: LockKeyhole },
@@ -87,6 +89,7 @@ export default function Configuration() {
   const tenantContext = useTenantGremio()
   const [tab, setTab] = useState('negocio')
   const [config, setConfig] = useState(DEFAULT_CONFIG)
+  const [selectedGremios, setSelectedGremios] = useState(() => readTenant().gremios ?? [])
   const [configLoaded, setConfigLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -105,6 +108,9 @@ export default function Configuration() {
   const [dianNumberings, setDianNumberings] = useState(null)
   const [licenseInfo, setLicenseInfo] = useState({ loading: false, summary: null, error: '', updatingAutoRenew: false })
   const currentPlan = String(licenseInfo.summary?.plan ?? tenant.plan ?? 'INICIO').trim().toUpperCase()
+  const isOwner = tenant.user?.role === 'OWNER'
+  const canManageGremios = isOwner && !demo && ['PRO', 'VEXORA', 'ENTERPRISE'].includes(currentPlan)
+  const gremioLimit = currentPlan === 'PRO' ? 2 : ['VEXORA', 'ENTERPRISE'].includes(currentPlan) ? 5 : 1
   const canConfigureDian = ['PRO', 'VEXORA', 'ENTERPRISE'].includes(currentPlan)
   const canManageDian = ['OWNER', 'SUPER_ADMIN'].includes(tenant.user?.role)
 
@@ -272,6 +278,28 @@ export default function Configuration() {
 
   async function submit(event) {
     event.preventDefault()
+    if (tab === 'gremios') {
+      if (!canManageGremios) {
+        setError('La administración de varios gremios requiere un plan PRO o VEXORA activo.')
+        return
+      }
+      setBusy(true)
+      setError('')
+      setMessage('')
+      try {
+        const result = await updateOwnTenantGremios(selectedGremios)
+        const updatedTenant = result.tenant
+        tenantContext.setGremios(updatedTenant.gremios, updatedTenant.sucursales)
+        setSelectedGremios(updatedTenant.gremios)
+        setGremio((current) => updatedTenant.gremios.includes(current) ? current : updatedTenant.gremios[0])
+        setMessage('Los gremios del negocio se actualizaron correctamente. Los datos históricos y sucursales se conservaron.')
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'No se pudieron actualizar los gremios del negocio.')
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
     if (!configLoaded) {
       setError('No se puede guardar hasta que la configuración guardada se haya cargado correctamente.')
       return
@@ -302,6 +330,32 @@ export default function Configuration() {
   }
 
   function renderTab() {
+    if (tab === 'gremios') return <div className="space-y-4">
+      <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+        <p className="font-bold text-violet-950">Plan {currentPlan} · hasta {gremioLimit} {gremioLimit === 1 ? 'gremio' : 'gremios'}</p>
+        <p className="mt-1 text-sm text-violet-800">Al quitar un gremio se conserva su información y sucursales, pero deja de estar disponible para operar. Primero reasigna o desactiva al personal activo asignado a ese gremio.</p>
+      </div>
+      {!canManageGremios && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Esta opción está disponible para el propietario con un plan PRO o VEXORA activo. <a href="/billing" className="font-bold underline">Ver planes</a></p>}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {GREMIOS.map((item) => {
+          const selected = selectedGremios.includes(item.id)
+          const limitReached = !selected && selectedGremios.length >= gremioLimit
+          const onlyGremio = selected && selectedGremios.length === 1
+          return <label key={item.id} className={`flex items-start gap-3 rounded-xl border p-4 ${selected ? 'border-violet-300 bg-violet-50' : 'border-zinc-200 bg-white'} ${(limitReached || onlyGremio || !canManageGremios || busy) ? 'opacity-60' : 'cursor-pointer'}`}>
+            <input
+              type="checkbox"
+              checked={selected}
+              disabled={!canManageGremios || busy || limitReached || onlyGremio}
+              onChange={(event) => setSelectedGremios((current) => event.target.checked
+                ? [...current, item.id]
+                : current.filter((gremioId) => gremioId !== item.id))}
+              className="mt-1 h-4 w-4 accent-violet-600"
+            />
+            <span><span className="block font-bold">{item.icon} {item.name}</span><span className="mt-1 block text-xs text-zinc-600">{item.desc}</span></span>
+          </label>
+        })}
+      </div>
+    </div>
     if (tab === 'negocio') return <div className="grid gap-4 sm:grid-cols-2">
       <Input label="Nombre del negocio" value={config.negocio.nombre || readTenant().business?.name} onChange={(event) => update('negocio', 'nombre', event.target.value)} maxLength={120} />
       <Input label="NIT" value={config.negocio.nit} onChange={(event) => update('negocio', 'nit', event.target.value)} maxLength={20} />
@@ -459,7 +513,7 @@ export default function Configuration() {
     </div>}
 
     <div className="mt-6 flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-2 shadow-inner">
-      {TABS.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)} className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${tab === id ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}><Icon className="h-4 w-4" />{label}</button>)}
+      {TABS.filter(({ id }) => id !== 'gremios' || (isOwner && !demo)).map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)} className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${tab === id ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}><Icon className="h-4 w-4" />{label}</button>)}
     </div>
 
     <div className="mt-6">
@@ -469,13 +523,13 @@ export default function Configuration() {
           <div className="rounded-full bg-vexora-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.15em] text-vexora-700">clienteId · {tenant.user?.id ?? tenant.business?.email ?? 'sin id'}</div>
         </div>
         {!configLoaded && <p role="status" className="mb-4 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">Cargando la configuración guardada de este negocio…</p>}
-        <fieldset disabled={!configLoaded} className="min-w-0 border-0 p-0">
+        <fieldset disabled={tab !== 'gremios' && !configLoaded} className="min-w-0 border-0 p-0">
           {renderTab()}
         </fieldset>
         {error && <p role="alert" className="mt-5 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
         {message && <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button type="submit" disabled={busy || !configLoaded} className="inline-flex items-center gap-2 rounded-xl bg-vexora-600 px-5 py-3 font-bold text-white shadow-lg shadow-vexora-600/20 hover:bg-vexora-700 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-4 w-4" />{busy ? 'Guardando…' : 'Guardar configuración'}</button>
+          <button type="submit" disabled={busy || (tab === 'gremios' ? !canManageGremios : !configLoaded)} className="inline-flex items-center gap-2 rounded-xl bg-vexora-600 px-5 py-3 font-bold text-white shadow-lg shadow-vexora-600/20 hover:bg-vexora-700 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-4 w-4" />{busy ? 'Guardando…' : tab === 'gremios' ? 'Guardar gremios' : 'Guardar configuración'}</button>
           {demo && <p className="text-xs text-slate-500">Los cambios de demo viven únicamente en esta sesión.</p>}
         </div>
       </form>

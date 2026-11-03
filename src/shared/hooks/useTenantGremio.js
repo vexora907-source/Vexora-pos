@@ -26,10 +26,12 @@ export function useTenantGremio() {
     if (!gremios.includes(activeGremio)) setActiveGremio(gremios[0] ?? '')
   }, [activeGremio, gremios])
 
-  const setGremios = useCallback((nextGremios) => {
+  const setGremios = useCallback((nextGremios, nextBranches) => {
     const unique = [...new Set(nextGremios)]
     const updates = { gremios: unique }
-    if (isDemoMode()) {
+    if (Array.isArray(nextBranches)) {
+      updates.sucursales = nextBranches
+    } else if (isDemoMode()) {
       const currentBranches = readTenant().sucursales ?? []
       updates.sucursales = [
         ...currentBranches.filter((branch) => unique.includes(branch.gremio)),

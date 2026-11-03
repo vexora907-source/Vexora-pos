@@ -71,3 +71,10 @@ export function assignTenantGremios(tenantId, gremios) {
     body: JSON.stringify({ gremios }),
   })
 }
+
+export function updateOwnTenantGremios(gremios) {
+  return apiRequest('/api/admin/gremios', {
+    method: 'PUT',
+    body: JSON.stringify({ gremios }),
+  })
+}
