@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Building2, CalendarClock, CircleDollarSign, Cpu, FileText, KeyRound, Layers, LockKeyhole, QrCode, Save, Wallet } from 'lucide-react'
-import { getBusinessConfig, saveBusinessConfig, updateOwnTenantGremios } from '../../shared/services/admin.js'
+import { ArrowLeft, Building2, CalendarClock, CircleDollarSign, Code2, Copy, Cpu, FileText, KeyRound, Layers, LockKeyhole, QrCode, RotateCw, Save, Trash2, Wallet } from 'lucide-react'
+import { createExternalApiKey, getBusinessConfig, getExternalApiKeys, revokeExternalApiKey, rotateExternalApiKey, saveBusinessConfig, updateOwnTenantGremios } from '../../shared/services/admin.js'
 import { API_URL } from '../../shared/services/api.js'
 import { printPrinterTest } from '../../shared/services/printers.js'
 import { getAuthToken } from '../../shared/services/auth.js'
@@ -44,6 +44,7 @@ const TABS = [
   { id: 'impuestos', label: 'Impuestos', icon: FileText },
   { id: 'ticket', label: 'Ticket', icon: QrCode },
   { id: 'gremios', label: 'Gremios del negocio', icon: Layers },
+  { id: 'api', label: 'API de inventario', icon: Code2 },
   { id: 'pagos', label: 'Métodos de pago', icon: Wallet },
   { id: 'licencia', label: 'Licencia', icon: KeyRound },
   { id: 'seguridad', label: 'Usuarios y seguridad', icon: LockKeyhole },
@@ -90,6 +91,10 @@ export default function Configuration() {
   const [tab, setTab] = useState('negocio')
   const [config, setConfig] = useState(DEFAULT_CONFIG)
   const [selectedGremios, setSelectedGremios] = useState(() => readTenant().gremios ?? [])
+  const [apiKeys, setApiKeys] = useState({ loading: false, saving: false, keys: [], error: '' })
+  const [apiKeyName, setApiKeyName] = useState('')
+  const [revealedApiKey, setRevealedApiKey] = useState('')
+  const [apiKeyCopied, setApiKeyCopied] = useState(false)
   const [configLoaded, setConfigLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -110,6 +115,16 @@ export default function Configuration() {
   const currentPlan = String(licenseInfo.summary?.plan ?? tenant.plan ?? 'INICIO').trim().toUpperCase()
   const isOwner = tenant.user?.role === 'OWNER'
   const canManageGremios = isOwner && !demo && ['PRO', 'VEXORA', 'ENTERPRISE'].includes(currentPlan)
+  const canViewApiKeys = isOwner && !demo
+  const apiLicense = licenseInfo.summary?.license
+  const apiSubscription = licenseInfo.summary?.subscription
+  const apiLicenseActive = apiLicense?.billingExemption?.enabled === true
+    || (apiLicense?.status === 'ACTIVE' && Date.parse(apiLicense.validUntil ?? '') > Date.now())
+    || (apiLicense?.status === 'PAST_DUE' && Date.parse(apiLicense.graceUntil ?? '') > Date.now())
+  const canManageApi = isOwner && !demo
+    && ['VEXORA', 'ENTERPRISE'].includes(currentPlan)
+    && apiSubscription?.status === 'ACTIVE'
+    && apiLicenseActive
   const gremioLimit = currentPlan === 'PRO' ? 2 : ['VEXORA', 'ENTERPRISE'].includes(currentPlan) ? 5 : 1
   const canConfigureDian = ['PRO', 'VEXORA', 'ENTERPRISE'].includes(currentPlan)
   const canManageDian = ['OWNER', 'SUPER_ADMIN'].includes(tenant.user?.role)
@@ -132,6 +147,24 @@ export default function Configuration() {
 
     return () => { active = false }
   }, [demo])
+
+  useEffect(() => {
+    if (tab !== 'api' || !canViewApiKeys) return undefined
+    let active = true
+    setApiKeys((current) => ({ ...current, loading: true, error: '' }))
+    getExternalApiKeys()
+      .then((result) => {
+        if (active) setApiKeys({ loading: false, saving: false, keys: result.apiKeys, error: '' })
+      })
+      .catch((cause) => {
+        if (active) setApiKeys((current) => ({
+          ...current,
+          loading: false,
+          error: cause instanceof Error ? cause.message : 'No se pudieron cargar las claves API.',
+        }))
+      })
+    return () => { active = false }
+  }, [tab, canViewApiKeys])
 
   useEffect(() => {
     if (demo || !API_URL || !getAuthToken() || !canConfigureDian || !canManageDian) return undefined
@@ -329,6 +362,62 @@ export default function Configuration() {
     }
   }
 
+  async function createApiKey() {
+    if (!canManageApi || apiKeyName.trim().length < 2) return
+    setApiKeys((current) => ({ ...current, saving: true, error: '' }))
+    setRevealedApiKey('')
+    setApiKeyCopied(false)
+    try {
+      const result = await createExternalApiKey(apiKeyName.trim())
+      setRevealedApiKey(result.token)
+      setApiKeyName('')
+      const refreshed = await getExternalApiKeys()
+      setApiKeys({ loading: false, saving: false, keys: refreshed.apiKeys, error: '' })
+    } catch (cause) {
+      setApiKeys((current) => ({
+        ...current,
+        saving: false,
+        error: cause instanceof Error ? cause.message : 'No se pudo crear la clave API.',
+      }))
+    }
+  }
+
+  async function rotateApiKey(apiKeyId) {
+    if (!window.confirm('La clave actual dejará de funcionar inmediatamente. ¿Quieres rotarla?')) return
+    setApiKeys((current) => ({ ...current, saving: true, error: '' }))
+    setRevealedApiKey('')
+    setApiKeyCopied(false)
+    try {
+      const result = await rotateExternalApiKey(apiKeyId)
+      setRevealedApiKey(result.token)
+      const refreshed = await getExternalApiKeys()
+      setApiKeys({ loading: false, saving: false, keys: refreshed.apiKeys, error: '' })
+    } catch (cause) {
+      setApiKeys((current) => ({
+        ...current,
+        saving: false,
+        error: cause instanceof Error ? cause.message : 'No se pudo rotar la clave API.',
+      }))
+    }
+  }
+
+  async function revokeApiKey(apiKeyId) {
+    if (!window.confirm('Esta clave dejará de funcionar inmediatamente. ¿Quieres revocarla?')) return
+    setApiKeys((current) => ({ ...current, saving: true, error: '' }))
+    try {
+      await revokeExternalApiKey(apiKeyId)
+      const refreshed = await getExternalApiKeys()
+      setApiKeys({ loading: false, saving: false, keys: refreshed.apiKeys, error: '' })
+      if (revealedApiKey) setRevealedApiKey('')
+    } catch (cause) {
+      setApiKeys((current) => ({
+        ...current,
+        saving: false,
+        error: cause instanceof Error ? cause.message : 'No se pudo revocar la clave API.',
+      }))
+    }
+  }
+
   function renderTab() {
     if (tab === 'gremios') return <div className="space-y-4">
       <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
@@ -355,6 +444,62 @@ export default function Configuration() {
           </label>
         })}
       </div>
+    </div>
+    if (tab === 'api') return <div className="space-y-5">
+      {!canManageApi && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-bold">La API de inventario está disponible con VEXORA.</p>
+          <p className="mt-1">El propietario podrá crear claves API cuando el negocio tenga una suscripción y licencia VEXORA activas. <a href="/billing" className="font-bold underline">Ver planes</a></p>
+        </div>
+      }
+      {canManageApi && <>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+            <p className="font-bold">API VEXORA · inventario y productos</p>
+            <p className="mt-1">Las claves solo permiten consultar y actualizar inventario de los gremios asignados a este negocio. Se aplican validación estricta, control de versión, aislamiento por negocio, auditoría y un límite de 120 solicitudes por minuto por clave.</p>
+            <p className="mt-2">Usa HTTPS/TLS. La clave completa se muestra una sola vez; el backend guarda únicamente su hash y permite rotarla o revocarla.</p>
+          </div>
+          <section className="space-y-3 rounded-xl border border-zinc-200 p-4">
+            <h3 className="font-bold">Crear clave API</h3>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Input label="Nombre de la integración" value={apiKeyName} onChange={(event) => setApiKeyName(event.target.value)} placeholder="Ej. Sistema de inventario" maxLength={80} />
+              <button type="button" disabled={apiKeys.saving || apiKeyName.trim().length < 2} onClick={() => void createApiKey()} className="self-end rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{apiKeys.saving ? 'Procesando…' : 'Crear clave'}</button>
+            </div>
+          </section>
+          {revealedApiKey && <section role="status" className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4">
+            <p className="font-bold text-amber-950">Copia la clave ahora; no se volverá a mostrar.</p>
+            <code className="block break-all rounded-lg bg-white p-3 text-xs text-zinc-800">{revealedApiKey}</code>
+            <button type="button" onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(revealedApiKey)
+                setApiKeyCopied(true)
+              } catch (cause) {
+                setApiKeys((current) => ({ ...current, error: cause instanceof Error ? `No se pudo copiar la clave: ${cause.message}` : 'No se pudo copiar la clave.' }))
+              }
+            }} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-amber-950"><Copy className="h-4 w-4" />{apiKeyCopied ? 'Copiada' : 'Copiar clave'}</button>
+          </section>}
+          <section className="space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm">
+            <h3 className="font-bold">Endpoints</h3>
+            <p><code>GET /api/v1/inventory/&#123;gremio&#125;</code> consulta inventario y versión actual.</p>
+            <p><code>PUT /api/v1/inventory/&#123;gremio&#125;</code> reemplaza la lista de productos con control de versión; envía <code>X-Vexora-API-Key</code> y JSON <code>&#123; &quot;version&quot;: 0, &quot;products&quot;: [] &#125;</code>.</p>
+            <p>El gremio debe pertenecer al negocio. Si la versión cambió, el servidor responde 409; vuelve a consultar antes de guardar.</p>
+          </section>
+        </>}
+      {apiKeys.error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{apiKeys.error}</p>}
+      <section className="space-y-3 rounded-xl border border-zinc-200 p-4">
+        <div className="flex items-center justify-between gap-3"><h3 className="font-bold">Claves de este negocio</h3><span className="text-xs text-zinc-500">Máximo 10 activas</span></div>
+        {apiKeys.loading && <p role="status" className="text-sm text-zinc-600">Cargando claves…</p>}
+        {!apiKeys.loading && apiKeys.keys.length === 0 && <p className="text-sm text-zinc-600">Todavía no hay claves API.</p>}
+        {apiKeys.keys.map((key) => <article key={key.id} className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold">{key.name} {key.revokedAt && <span className="ml-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-800">Revocada</span>}</p>
+            <p className="mt-1 text-xs text-zinc-600">Permisos: {key.scopes.join(', ')} · Creada: {key.createdAt ? new Date(key.createdAt).toLocaleDateString('es-CO') : '—'}</p>
+            <p className="text-xs text-zinc-500">Último uso: {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString('es-CO') : 'Sin uso registrado'}</p>
+          </div>
+          {!key.revokedAt && <div className="flex gap-2">
+            {canManageApi && <button type="button" disabled={apiKeys.saving} onClick={() => void rotateApiKey(key.id)} aria-label={`Rotar clave ${key.name}`} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold disabled:opacity-50"><RotateCw className="h-3.5 w-3.5" />Rotar</button>}
+            <button type="button" disabled={apiKeys.saving} onClick={() => void revokeApiKey(key.id)} aria-label={`Revocar clave ${key.name}`} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" />Revocar</button>
+          </div>}
+        </article>)}
+      </section>
     </div>
     if (tab === 'negocio') return <div className="grid gap-4 sm:grid-cols-2">
       <Input label="Nombre del negocio" value={config.negocio.nombre || readTenant().business?.name} onChange={(event) => update('negocio', 'nombre', event.target.value)} maxLength={120} />
@@ -513,7 +658,7 @@ export default function Configuration() {
     </div>}
 
     <div className="mt-6 flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-2 shadow-inner">
-      {TABS.filter(({ id }) => id !== 'gremios' || (isOwner && !demo)).map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)} className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${tab === id ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}><Icon className="h-4 w-4" />{label}</button>)}
+      {TABS.filter(({ id }) => !['gremios', 'api'].includes(id) || (isOwner && !demo)).map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)} className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${tab === id ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'}`}><Icon className="h-4 w-4" />{label}</button>)}
     </div>
 
     <div className="mt-6">
@@ -523,13 +668,13 @@ export default function Configuration() {
           <div className="rounded-full bg-vexora-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.15em] text-vexora-700">clienteId · {tenant.user?.id ?? tenant.business?.email ?? 'sin id'}</div>
         </div>
         {!configLoaded && <p role="status" className="mb-4 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">Cargando la configuración guardada de este negocio…</p>}
-        <fieldset disabled={tab !== 'gremios' && !configLoaded} className="min-w-0 border-0 p-0">
+        <fieldset disabled={!['gremios', 'api'].includes(tab) && !configLoaded} className="min-w-0 border-0 p-0">
           {renderTab()}
         </fieldset>
         {error && <p role="alert" className="mt-5 rounded-xl bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
         {message && <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button type="submit" disabled={busy || (tab === 'gremios' ? !canManageGremios : !configLoaded)} className="inline-flex items-center gap-2 rounded-xl bg-vexora-600 px-5 py-3 font-bold text-white shadow-lg shadow-vexora-600/20 hover:bg-vexora-700 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-4 w-4" />{busy ? 'Guardando…' : tab === 'gremios' ? 'Guardar gremios' : 'Guardar configuración'}</button>
+          {tab !== 'api' && <button type="submit" disabled={busy || (tab === 'gremios' ? !canManageGremios : !configLoaded)} className="inline-flex items-center gap-2 rounded-xl bg-vexora-600 px-5 py-3 font-bold text-white shadow-lg shadow-vexora-600/20 hover:bg-vexora-700 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-4 w-4" />{busy ? 'Guardando…' : tab === 'gremios' ? 'Guardar gremios' : 'Guardar configuración'}</button>}
           {demo && <p className="text-xs text-slate-500">Los cambios de demo viven únicamente en esta sesión.</p>}
         </div>
       </form>

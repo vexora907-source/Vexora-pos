@@ -17,7 +17,7 @@ const features = {
   INICIO: ['1 gremio activo', '1 usuario / 1 sucursal', '300 productos', 'POS, modo offline y exportación a Excel', '0 facturas DIAN'],
   NEGOCIO: ['1 gremio potenciado', '3 usuarios / 1 sucursal', 'Productos ilimitados', 'Módulos profesionales y panel admin', '30 facturas DIAN al mes'],
   PRO: ['Hasta 2 gremios simultáneos', '6 usuarios / 2 sucursales', 'Multi-caja y reportes consolidados', 'Ingredientes, domicilios y soporte prioritario', '100 facturas DIAN al mes'],
-  VEXORA: ['Hasta 5 gremios simultáneos', '12 usuarios / sucursales ilimitadas', 'Marca blanca + API', 'Instalación presencial Yumbo/Cali', '250 facturas DIAN al mes'],
+  VEXORA: ['Hasta 5 gremios simultáneos', '12 usuarios / sucursales ilimitadas', 'Marca blanca', 'API segura de inventario para integraciones externas', '250 facturas DIAN al mes'],
 }
 
 export default function Billing() {

@@ -78,3 +78,22 @@ export function updateOwnTenantGremios(gremios) {
     body: JSON.stringify({ gremios }),
   })
 }
+
+export function getExternalApiKeys() {
+  return apiRequest('/api/admin/api-keys')
+}
+
+export function createExternalApiKey(name) {
+  return apiRequest('/api/admin/api-keys', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export function rotateExternalApiKey(apiKeyId) {
+  return apiRequest(`/api/admin/api-keys/${encodeURIComponent(apiKeyId)}/rotate`, { method: 'POST' })
+}
+
+export function revokeExternalApiKey(apiKeyId) {
+  return apiRequest(`/api/admin/api-keys/${encodeURIComponent(apiKeyId)}`, { method: 'DELETE' })
+}
