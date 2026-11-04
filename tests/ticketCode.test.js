@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { prepareTicketCode } from '../src/shared/services/ticketCode.js'
+import { mapTicketBusiness, prepareTicketCode } from '../src/shared/services/ticketCode.js'
 
 test('prepares a QR from a verification URL or ticket reference', () => {
   const qr = prepareTicketCode({ saleKey: 'sale-123', verificationUrl: 'https://example.test/verify/123' }, { tipoCodigo: 'QR' })
@@ -26,4 +26,17 @@ test('accepts only a backend-provided 12 digit barcode', () => {
 
   const legacyAlias = prepareTicketCode({ facturaCodigo12: '750000010234' }, { tipoCodigo: 'BARCODE' })
   assert.equal(legacyAlias.barcode12, '')
+})
+
+test('uses saved per-gremio business details while keeping tenant fallbacks', () => {
+  const business = mapTicketBusiness(
+    { name: 'Nombre del negocio', address: 'Dirección anterior', phone: '3000000000' },
+    { nombre: 'Tienda por gremio', logo: 'https://example.test/logo.png', mensajeTicket: 'Gracias' },
+  )
+
+  assert.equal(business.name, 'Tienda por gremio')
+  assert.equal(business.logo, 'https://example.test/logo.png')
+  assert.equal(business.message, 'Gracias')
+  assert.equal(business.address, 'Dirección anterior')
+  assert.equal(business.phone, '3000000000')
 })

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Printer, X } from 'lucide-react'
 import { formatCOP } from '../../services/ticket.js'
 import { getCustomers, getRegisteredCustomers, saveCustomer } from '../../services/customerService.js'
-import { getTicketCodeSettings } from '../../services/ticketCode.js'
+import { getTicketConfiguration, mapTicketBusiness } from '../../services/ticketCode.js'
 import { isDemoMode } from '../../services/tenantStorage.js'
 import { useTenantGremio } from '../../hooks/useTenantGremio.js'
 import { InvoicePreview } from '../DianModule/InvoicePreview.jsx'
@@ -26,10 +26,12 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
   const [printerMessage, setPrinterMessage] = useState('')
   const [ticketSettings, setTicketSettings] = useState({ tipoCodigo: 'QR' })
   const [ticketSettingsLoaded, setTicketSettingsLoaded] = useState(false)
+  const [ticketBusinessConfig, setTicketBusinessConfig] = useState({})
+  const [ticketBusinessError, setTicketBusinessError] = useState('')
   const fallbackSaleKey = useRef(globalThis.crypto?.randomUUID?.() ?? `sale-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   const autoPrintTriggered = useRef(false)
   const saleGremio = gremio ?? tenant.activeGremio
-  const business = tenant.business ?? {}
+  const business = mapTicketBusiness(tenant.business ?? {}, ticketBusinessConfig)
   const demo = isDemoMode()
   const canPrintThermalInvoice = ['PRO', 'VEXORA'].includes(canonicalPlan(String(tenant.plan ?? '').toUpperCase()))
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -117,10 +119,24 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
   useEffect(() => {
     if (!saleGremio) return undefined
     let active = true
-    getTicketCodeSettings(saleGremio)
-      .then((settings) => { if (active) setTicketSettings(settings) })
-      .catch(() => { if (active) setTicketSettings({ tipoCodigo: 'QR' }) })
-      .finally(() => { if (active) setTicketSettingsLoaded(true) })
+    setTicketSettingsLoaded(false)
+    setTicketSettings({ tipoCodigo: 'QR' })
+    setTicketBusinessConfig({})
+    setTicketBusinessError('')
+    getTicketConfiguration(saleGremio)
+      .then((config) => {
+        if (!active) return
+        setTicketBusinessConfig(config.negocio ?? {})
+        setTicketSettings({ tipoCodigo: config.ticket?.tipoCodigo === 'BARCODE' ? 'BARCODE' : 'QR' })
+      })
+      .catch((cause) => {
+        if (!active) return
+        setTicketSettings({ tipoCodigo: 'QR' })
+        setTicketBusinessError(cause instanceof Error ? cause.message : 'No se pudo cargar el logo y los datos del ticket.')
+      })
+      .finally(() => {
+        if (active) setTicketSettingsLoaded(true)
+      })
     return () => { active = false }
   }, [saleGremio])
 
@@ -211,6 +227,7 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
           </form>}
         </section>
         {printerError && <p role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-xs text-rose-800 print:hidden">{printerError}</p>}
+        {ticketBusinessError && <p role="alert" className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 print:hidden">No se cargaron el logo o los datos comerciales del ticket: {ticketBusinessError}</p>}
         {printerMessage && <p role="status" className="mt-3 text-xs font-semibold text-emerald-700 print:hidden">{printerMessage}</p>}
         <div className="mt-3 grid gap-2 sm:grid-cols-2 print:hidden">
           {dian?.enabled ? <button type="button" onClick={() => setShowInvoice(true)} className="flex items-center justify-center gap-2 rounded-xl bg-vexora-600 px-4 py-3 text-sm font-bold text-white hover:bg-vexora-700 sm:col-span-2">Continuar con factura DIAN</button> : <button type="button" onClick={() => void printSaleReceipt()} className="flex items-center justify-center gap-2 rounded-xl bg-vexora-600 px-4 py-3 text-sm font-bold text-white hover:bg-vexora-700"><Printer className="h-4 w-4" />Imprimir ticket</button>}

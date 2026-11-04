@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowLeft, LogIn, ShieldCheck } from 'lucide-react'
 import { login } from '../../shared/services/auth.js'
-import { saveTenant } from '../../shared/services/tenantStorage.js'
+import { clearTenant, saveTenant } from '../../shared/services/tenantStorage.js'
 
 export default function Login() {
   const [error, setError] = useState('')
@@ -16,6 +16,7 @@ export default function Login() {
     try {
       const result = await login(String(form.get('email')).trim(), String(form.get('password')))
       const tenant = result.tenant
+      clearTenant()
       saveTenant({
         id: tenant.id ?? tenant._id,
         business: {

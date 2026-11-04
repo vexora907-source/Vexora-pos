@@ -77,7 +77,7 @@ function UserEditor({ user, branches, gremios, onSave }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    role: user.role,
+    role: user.role === 'CASHIER' ? 'CAJERO' : user.role,
     gremio: user.gremio ?? gremios[0],
     sucursal: user.sucursal ?? '',
     active: user.active !== false,
@@ -135,7 +135,9 @@ function UserEditor({ user, branches, gremios, onSave }) {
         <span className={`font-bold ${user.active === false ? 'text-rose-700' : 'text-emerald-700'}`}>{user.active === false ? 'Inactivo' : 'Activo'}</span>
       </>}
       {editing ? <button disabled={busy} className="inline-flex items-center justify-center gap-1 rounded-lg bg-zinc-900 px-3 py-2 font-bold text-white disabled:opacity-50"><Save className="h-3.5 w-3.5" />{busy ? 'Guardando' : 'Guardar'}</button>
-        : <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center justify-center gap-1 rounded-lg border px-3 py-2 font-bold"><Pencil className="h-3.5 w-3.5" />Editar</button>}
+        : ['OWNER', 'SUPER_ADMIN'].includes(user.role)
+          ? <span className="text-center text-[10px] font-semibold text-zinc-500">Cuenta protegida</span>
+          : <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center justify-center gap-1 rounded-lg border px-3 py-2 font-bold"><Pencil className="h-3.5 w-3.5" />Editar</button>}
     </div>
     {editing && <div className="mt-3 grid gap-2 sm:grid-cols-2"><input type="password" autoComplete="new-password" minLength="10" maxLength="72" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Nueva contraseña (opcional)" className="rounded-lg border p-2.5 text-xs" /><input type="password" autoComplete="new-password" minLength="10" maxLength="72" value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} placeholder="Verificar nueva contraseña" className="rounded-lg border p-2.5 text-xs" /><p className="sm:col-span-2 text-[11px] text-zinc-500">La contraseña se almacena con hash y nunca se muestra en pantalla.</p>{error && <p role="alert" className="sm:col-span-2 text-xs text-rose-700">{error}</p>}<button type="button" onClick={() => { setEditing(false); setPassword(''); setPasswordConfirmation(''); setError('') }} className="justify-self-start rounded-lg px-3 py-2 text-xs font-bold text-zinc-600">Cancelar</button></div>}
   </form>

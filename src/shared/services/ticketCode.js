@@ -1,21 +1,36 @@
-import { getBusinessConfig } from './admin.js'
 import JsBarcode from 'jsbarcode'
 import QRCode from 'qrcode'
+import { apiRequest } from './api.js'
 import { appStorage, isDemoMode } from './tenantStorage.js'
 
 const CONFIG_KEY = 'vexora.business.config'
 const BARCODE_PATTERN = /^\d{12}$/
 
-export async function getTicketCodeSettings(gremio) {
-  let config
+export async function getTicketConfiguration(gremio) {
   if (isDemoMode()) {
-    config = JSON.parse(appStorage().getItem(`${CONFIG_KEY}:${gremio}`) ?? 'null') ?? {}
-  } else {
-    const result = await getBusinessConfig(gremio)
-    config = result.config ?? {}
+    return JSON.parse(appStorage().getItem(`${CONFIG_KEY}:${gremio}`) ?? 'null') ?? {}
   }
+  const result = await apiRequest(`/api/printers/${encodeURIComponent(gremio)}/ticket-config`)
+  return result.config ?? {}
+}
 
+export async function getTicketCodeSettings(gremio) {
+  const config = await getTicketConfiguration(gremio)
   return { tipoCodigo: config.ticket?.tipoCodigo === 'BARCODE' ? 'BARCODE' : 'QR' }
+}
+
+export function mapTicketBusiness(tenantBusiness = {}, configuredBusiness = {}) {
+  return {
+    ...tenantBusiness,
+    name: configuredBusiness.nombre || tenantBusiness.name,
+    razonSocial: configuredBusiness.razonSocial || tenantBusiness.razonSocial,
+    nit: configuredBusiness.nit || tenantBusiness.nit,
+    logo: configuredBusiness.logo || tenantBusiness.logo,
+    address: configuredBusiness.direccion || tenantBusiness.address,
+    phone: configuredBusiness.telefono || tenantBusiness.phone,
+    mensajeTicket: configuredBusiness.mensajeTicket || tenantBusiness.mensajeTicket,
+    message: configuredBusiness.mensajeTicket || tenantBusiness.message,
+  }
 }
 
 export function prepareTicketCode(ticket, settings = {}) {

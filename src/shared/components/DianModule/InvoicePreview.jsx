@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Printer, QrCode, X } from 'lucide-react'
 import { formatCOP } from '../../services/ticket.js'
 import { submitDianInvoice } from '../../services/dianService.js'
-import { getBusinessConfig } from '../../services/admin.js'
-import { appStorage, isDemoMode } from '../../services/tenantStorage.js'
+import { getTicketConfiguration } from '../../services/ticketCode.js'
 import { DianStatus } from './DianStatus.jsx'
 import { TicketFacturaElectronica } from './TicketFacturaElectronica.jsx'
 
@@ -27,25 +26,16 @@ export function InvoicePreview({ invoice, dian, business, gremio, canPrintTherma
   onIssuedRef.current = onIssued
 
   useEffect(() => {
-    if (!canPrintThermalInvoice || !gremio) return undefined
+    if (!gremio) return undefined
     let cancelled = false
     setBusinessConfigError('')
-    if (isDemoMode()) {
-      try {
-        const saved = JSON.parse(appStorage().getItem(`vexora.business.config:${gremio}`) ?? 'null')
-        if (!cancelled) setBusinessConfig(saved?.negocio ?? {})
-      } catch (cause) {
-        if (!cancelled) setBusinessConfigError(cause instanceof Error ? cause.message : 'No se pudo leer la configuración del negocio.')
-      }
-      return () => { cancelled = true }
-    }
-    getBusinessConfig(gremio).then((response) => {
-      if (!cancelled) setBusinessConfig(response.config?.negocio ?? {})
+    getTicketConfiguration(gremio).then((config) => {
+      if (!cancelled) setBusinessConfig(config.negocio ?? {})
     }).catch((cause) => {
       if (!cancelled) setBusinessConfigError(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración del negocio.')
     })
     return () => { cancelled = true }
-  }, [canPrintThermalInvoice, gremio])
+  }, [gremio])
 
   useEffect(() => {
     if (String(dian.status).toLowerCase() !== 'active') return undefined
