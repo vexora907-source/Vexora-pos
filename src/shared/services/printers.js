@@ -303,20 +303,25 @@ export async function getPrinterConfig(gremio) {
   return apiRequest(`/api/printers/${encodeURIComponent(gremio)}/config`).then((result) => result.printers)
 }
 
-export async function printPrinterTest(gremio, target, printer) {
-  const ticket = {
-    negocio: { nombre: 'PRUEBA VEXORA POS', nit: 'TEST' },
-    numero: 'TEST-001',
-    cliente: { nombre: 'Cliente de prueba' },
-    mesa: 'Prueba',
-    productos: [{ nombre: 'Prueba de impresión', cantidad: 1, total: 1000 }],
-    total: 1000,
-  }
+export async function printPrinterTest(gremio, target, printer, ticket = {
+  negocio: { nombre: 'PRUEBA VEXORA POS', nit: 'TEST' },
+  numero: 'TEST-001',
+  cliente: { nombre: 'Cliente de prueba' },
+  mesa: 'Prueba',
+  productos: [{ nombre: 'Prueba de impresión', cantidad: 1, total: 1000 }],
+  total: 1000,
+}) {
+  const printableTicket = await preparePrintableTicket(gremio, target, ticket)
   if (printer.tipo === 'usb') {
-    return printUsb(ticket, target, true)
+    return printUsb(printableTicket, target, true)
   }
   if (isDemoMode()) throw new Error('La demo no se conecta a impresoras de red ni al backend.')
-  await apiRequest(`/api/printers/${encodeURIComponent(gremio)}/test/${target}`, { method: 'POST', body: '{}' })
+  const { codeImage: _codeImage, negocio, ...networkTicket } = printableTicket
+  const { logoPrintImage: _logoPrintImage, ...networkBusiness } = negocio ?? {}
+  await apiRequest(`/api/printers/${encodeURIComponent(gremio)}/test/${target}`, {
+    method: 'POST',
+    body: JSON.stringify({ ticket: { ...networkTicket, ...(negocio ? { negocio: networkBusiness } : {}) } }),
+  })
 }
 
 export async function printConfiguredUsbTicket(gremio, target, ticket) {

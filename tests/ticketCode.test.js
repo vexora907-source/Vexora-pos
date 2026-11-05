@@ -15,6 +15,10 @@ test('accepts only a backend-provided 12 digit barcode', () => {
   assert.equal(barcode.tipoCodigo, 'BARCODE')
   assert.equal(barcode.barcode12, '750000010234')
 
+  const barcodeOverridesQr = prepareTicketCode({ barcode12: '750000010234' }, { tipoCodigo: 'QR' })
+  assert.equal(barcodeOverridesQr.tipoCodigo, 'BARCODE')
+  assert.equal(barcodeOverridesQr.barcode12, '750000010234')
+
   const missing = prepareTicketCode({ numero: 'sale-456' }, { tipoCodigo: 'BARCODE' })
   assert.equal(missing.barcode12, '')
 

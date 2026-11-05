@@ -34,9 +34,9 @@ export function mapTicketBusiness(tenantBusiness = {}, configuredBusiness = {}) 
 }
 
 export function prepareTicketCode(ticket, settings = {}) {
-  const tipoCodigo = settings.tipoCodigo === 'BARCODE' ? 'BARCODE' : 'QR'
   const rawBarcode = ticket.barcode12 ?? ''
   const barcode12 = typeof rawBarcode === 'string' && BARCODE_PATTERN.test(rawBarcode) ? rawBarcode : ''
+  const tipoCodigo = barcode12 || settings.tipoCodigo === 'BARCODE' ? 'BARCODE' : 'QR'
   const qrValue = String(ticket.verificationUrl ?? ticket.qrUrl ?? ticket.saleKey ?? ticket.numero ?? '')
 
   return {

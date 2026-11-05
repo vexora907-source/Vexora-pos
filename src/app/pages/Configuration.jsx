@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Building2, CalendarClock, CircleDollarSign, Code2, Copy, Cpu, FileText, KeyRound, Layers, LockKeyhole, QrCode, RotateCw, Save, Trash2, Wallet } from 'lucide-react'
+import { ArrowLeft, Building2, CalendarClock, CircleDollarSign, Code2, Copy, Cpu, FileText, KeyRound, Layers, LockKeyhole, Printer, QrCode, RotateCw, Save, Trash2, Wallet, X } from 'lucide-react'
 import { createExternalApiKey, getBusinessConfig, getExternalApiKeys, revokeExternalApiKey, rotateExternalApiKey, saveBusinessConfig, updateOwnTenantGremios } from '../../shared/services/admin.js'
 import { API_URL } from '../../shared/services/api.js'
 import { printPrinterTest } from '../../shared/services/printers.js'
@@ -9,6 +9,7 @@ import { fetchLicenseSummary, updateAutoRenew } from '../../shared/services/lice
 import { configureDian, getDianConfiguration, syncDianNumberings } from '../../shared/services/dianService.js'
 import { useTenantGremio } from '../../shared/hooks/useTenantGremio.js'
 import { DianConfig } from '../../shared/components/DianModule/DianConfig.jsx'
+import TicketPro from '../../shared/components/Payment/TicketPro.jsx'
 import { TutorialGremio } from '../components/TutorialGremio.jsx'
 import { GREMIOS } from '../components/GremioSelector.jsx'
 
@@ -103,6 +104,7 @@ export default function Configuration() {
   const tenant = readTenant()
   const [gremio, setGremio] = useState(tenant.gremios?.[0] ?? '')
   const [printerTestBusy, setPrinterTestBusy] = useState('')
+  const [printerTestPreview, setPrinterTestPreview] = useState(null)
   const [showTutorial, setShowTutorial] = useState(false)
   const [dianSettings, setDianSettings] = useState({ configured: false, accountId: '', environment: 'PRUEBAS' })
   const [dianSettingsLoading, setDianSettingsLoading] = useState(false)
@@ -238,11 +240,44 @@ export default function Configuration() {
     }))
   }
 
-  async function testPrinter(target) {
+  function testPrinter(target) {
     if (!configLoaded) {
       setError('Espera a que la configuración guardada termine de cargar antes de probar la impresora.')
       return
     }
+    setError('')
+    setMessage('')
+    setPrinterTestPreview({
+      target,
+      ticket: {
+        negocio: {
+          nombre: config.negocio.nombre || readTenant().business?.name || 'VEXORA POS',
+          razonSocial: config.negocio.razonSocial,
+          nit: config.negocio.nit,
+          logo: config.negocio.logo,
+          direccion: config.negocio.direccion,
+          telefono: config.negocio.telefono,
+          mensajeTicket: config.negocio.mensajeTicket,
+        },
+        numero: 'PRUEBA-001',
+        saleKey: 'PRUEBA-001',
+        barcode12: '',
+        tipoCodigo: config.ticket.tipoCodigo,
+        qrValue: 'PRUEBA-001',
+        cliente: { nombre: 'Cliente de prueba' },
+        mesa: 'Prueba',
+        tipo: 'Mostrador',
+        fecha: new Date().toLocaleString('es-CO'),
+        productos: [{ nombre: 'Producto de prueba', cantidad: 1, total: 1000 }],
+        total: 1000,
+        paymentMethod: 'Efectivo',
+      },
+    })
+  }
+
+  async function printTestPreview() {
+    if (!printerTestPreview) return
+    const { target, ticket } = printerTestPreview
     const key = target === 'caja' ? 'impresoraCaja' : 'impresoraCocina'
     const printer = config.hardware[key]
     setPrinterTestBusy(target)
@@ -268,16 +303,17 @@ export default function Configuration() {
         }
       }
       if (printer.tipo === 'usb') {
-        const method = await printPrinterTest(gremio, target, printer)
         await savePrinterConfig()
+        const method = await printPrinterTest(gremio, target, printer, ticket)
         setMessage(method === 'system'
           ? 'Se abrió la ventana de impresión. Selecciona la impresora térmica y confirma.'
           : `Impresora de ${target} probada correctamente.`)
       } else {
         await savePrinterConfig()
-        await printPrinterTest(gremio, target, printer)
+        await printPrinterTest(gremio, target, printer, ticket)
         setMessage(`Impresora de ${target} probada correctamente.`)
       }
+      setPrinterTestPreview(null)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `No se pudo probar la impresora de ${target}.`)
     } finally {
@@ -679,5 +715,32 @@ export default function Configuration() {
         </div>
       </form>
     </div>
-  </div>{showTutorial && gremio && <TutorialGremio tenant={tenant} gremio={gremio} plan={tenant.plan} onClose={() => setShowTutorial(false)} />}</main>
+  </div>{printerTestPreview && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="presentation" onMouseDown={(event) => {
+    if (event.target === event.currentTarget && !printerTestBusy) setPrinterTestPreview(null)
+  }}>
+    <section role="dialog" aria-modal="true" aria-labelledby="printer-test-preview-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+      <header className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 id="printer-test-preview-title" className="text-lg font-black">Vista previa de impresión</h2>
+          <p className="mt-1 text-sm text-zinc-600">{printerTestPreview.target === 'caja' ? 'Así se verá el ticket de prueba.' : 'Así se verá la comanda de prueba.'}</p>
+        </div>
+        <button type="button" disabled={Boolean(printerTestBusy)} onClick={() => setPrinterTestPreview(null)} aria-label="Cerrar vista previa" className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 disabled:opacity-50"><X className="h-5 w-5" /></button>
+      </header>
+      {printerTestPreview.target === 'caja'
+        ? <TicketPro datos={printerTestPreview.ticket} tipoCodigo={printerTestPreview.ticket.tipoCodigo} />
+        : <article className="mx-auto w-full max-w-[360px] rounded-lg border border-zinc-200 bg-white p-5 text-zinc-900">
+          <h3 className="text-center text-lg font-black">{printerTestPreview.ticket.negocio.nombre}</h3>
+          <p className="mt-2 border-b border-dashed py-2 text-center font-bold">COMANDA DE PRUEBA</p>
+          <p className="py-2 text-xs">{printerTestPreview.ticket.fecha}</p>
+          {printerTestPreview.ticket.productos.map((product) => <p key={product.nombre} className="border-t border-zinc-100 py-2 text-sm">{product.cantidad} × {product.nombre}</p>)}
+          <p className="mt-2 border-t border-dashed pt-2 text-center text-xs">No es una venta real.</p>
+        </article>}
+      {printerTestPreview.target === 'caja' && printerTestPreview.ticket.tipoCodigo === 'BARCODE' && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Esta prueba no es una venta real; no se genera un código de barras. Solo se imprime cuando el backend entrega un consecutivo válido de 12 dígitos.</p>}
+      {error && <p role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+      <footer className="mt-5 flex justify-end gap-3">
+        <button type="button" disabled={Boolean(printerTestBusy)} onClick={() => setPrinterTestPreview(null)} className="rounded-lg border px-4 py-2 text-sm font-bold disabled:opacity-50">Cerrar</button>
+        <button type="button" disabled={Boolean(printerTestBusy)} onClick={() => void printTestPreview()} className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Printer className="h-4 w-4" />{printerTestBusy ? 'Imprimiendo…' : 'Imprimir prueba'}</button>
+      </footer>
+    </section>
+  </div>}{showTutorial && gremio && <TutorialGremio tenant={tenant} gremio={gremio} plan={tenant.plan} onClose={() => setShowTutorial(false)} />}</main>
 }

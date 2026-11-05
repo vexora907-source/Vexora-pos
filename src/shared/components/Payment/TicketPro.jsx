@@ -65,7 +65,7 @@ export default function TicketPro({ datos = {}, tipoCodigo = 'QR' }) {
       <div className="divide-y divide-zinc-100">
         {items.map((item, index) => {
           const quantity = Number(item.quantity ?? item.cantidad) || 0
-          const price = Number(item.price ?? item.precio) || 0
+          const price = Number(item.price ?? item.precio ?? (Number(item.total) / quantity)) || 0
           return <div key={item.id ?? item.lineId ?? `${item.name ?? item.nombre}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 py-2 text-xs">
             <div className="min-w-0">
               <p className="break-words font-semibold">{quantity} × {item.name ?? item.nombre}</p>

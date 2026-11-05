@@ -9,6 +9,8 @@ import { adminPlanHasFeature, canonicalAdminPlan, FEATURE_PLANS } from '../../sh
 import { CashRegister } from '../../shared/components/CashRegister/CashRegister.jsx'
 import { fetchLicenseSummary } from '../../shared/services/licenseService.js'
 import { printUniversalTicket } from '../../shared/services/thermalPrint.js'
+import { printReceipt } from '../../shared/services/printers.js'
+import { getTicketConfiguration, mapTicketBusiness } from '../../shared/services/ticketCode.js'
 import { readTenant } from '../../shared/services/tenantStorage.js'
 
 const gremioLabels = { papeleria: 'Papelería', cerrajeria: 'Cerrajería', restaurante: 'Restaurante', ferreteria: 'Ferretería', tienda: 'Tienda', ropa: 'Ropa', comidas_rapidas: 'Comidas rápidas' }
@@ -166,6 +168,7 @@ export default function Admin() {
   const [expenseBusy, setExpenseBusy] = useState(false)
   const [expenseError, setExpenseError] = useState('')
   const [planError, setPlanError] = useState('')
+  const [printingSaleKey, setPrintingSaleKey] = useState('')
 
   const branchesForGremio = useMemo(() => branches.filter((branch) => branch.gremio === gremio), [branches, gremio])
 
@@ -257,6 +260,51 @@ export default function Admin() {
     const result = await getAdminUsers()
     setUsers(result.users)
     setNotice('Usuario actualizado.')
+  }
+
+  async function reprintSale(sale) {
+    if (!sale.gremio || !Array.isArray(sale.items) || sale.items.length === 0) {
+      setError('Esta venta no tiene artículos guardados para imprimir una copia.')
+      return
+    }
+
+    setError('')
+    setNotice('')
+    setPrintingSaleKey(sale.saleKey)
+    try {
+      const ticketConfig = await getTicketConfiguration(sale.gremio)
+      const business = mapTicketBusiness(tenant.business ?? {}, ticketConfig.negocio ?? {})
+      const hasBarcode = typeof sale.barcode12 === 'string' && /^\d{12}$/.test(sale.barcode12)
+      await printReceipt(sale.gremio, {
+        negocio: {
+          nombre: business.name,
+          razonSocial: business.razonSocial,
+          nit: business.nit,
+          logo: business.logo,
+          direccion: business.address,
+          telefono: business.phone,
+          mensajeTicket: business.message,
+        },
+        numero: hasBarcode ? sale.barcode12 : sale.saleKey,
+        saleKey: sale.saleKey,
+        barcode12: hasBarcode ? sale.barcode12 : '',
+        tipoCodigo: hasBarcode ? 'BARCODE' : ticketConfig.ticket?.tipoCodigo,
+        createdAt: sale.createdAt,
+        productos: sale.items.map((item) => ({
+          nombre: item.name,
+          cantidad: item.quantity,
+          total: item.price * item.quantity,
+        })),
+        total: sale.total,
+        paymentMethod: sale.paymentMethod,
+        copy: true,
+      })
+      setNotice('Copia de la venta enviada a impresión.')
+    } catch (cause) {
+      setError(cause instanceof Error ? `No se pudo imprimir la copia: ${cause.message}` : 'No se pudo imprimir la copia.')
+    } finally {
+      setPrintingSaleKey('')
+    }
   }
 
   function setDateRange(range) {
@@ -382,7 +430,7 @@ export default function Admin() {
       </div>
       </> : <UpgradeNotice feature="advancedCharts" currentPlan={currentPlan} />}
       <div className="overflow-x-auto rounded-2xl border bg-white"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-zinc-100 text-xs uppercase text-zinc-500"><tr><th className="p-3">Fecha</th><th className="p-3">Gremio</th><th className="p-3">Cajero</th><th className="p-3">N.º ventas</th><th className="p-3">Total</th></tr></thead><tbody>{report.summary.map((row) => <tr key={`${row.fecha}:${row.gremio}:${row.cajero}`} className="border-t"><td className="p-3">{row.fecha}</td><td className="p-3">{gremioLabels[row.gremio] ?? row.gremio}</td><td className="p-3">{row.cajero}</td><td className="p-3">{row.ventas}</td><td className="p-3 font-bold">{money(row.total)}</td></tr>)}{!report.summary.length && <tr><td colSpan="5" className="p-6 text-center text-zinc-500">Sin datos agregados para este periodo.</td></tr>}</tbody></table></div>
-      <details className="overflow-hidden rounded-2xl border bg-white"><summary className="cursor-pointer p-4 font-bold">Ver historial detallado de ventas</summary><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-zinc-100 text-xs uppercase text-zinc-500"><tr><th className="p-3">Fecha</th><th className="p-3">Gremio</th><th className="p-3">Cajero</th><th className="p-3">Pago</th><th className="p-3">Total</th></tr></thead><tbody>{report.sales.map((sale) => <tr key={sale.saleKey} className="border-t"><td className="p-3">{new Date(sale.createdAt).toLocaleString('es-CO')}</td><td className="p-3">{gremioLabels[sale.gremio] ?? sale.gremio}</td><td className="p-3">{sale.user?.name ?? 'Usuario'}</td><td className="p-3">{sale.paymentMethod}</td><td className="p-3 font-bold">{money(sale.total)}</td></tr>)}{!report.sales.length && <tr><td colSpan="5" className="p-8 text-center text-zinc-500">No hay ventas en el periodo seleccionado.</td></tr>}</tbody></table></div></details>
+      <details className="overflow-hidden rounded-2xl border bg-white"><summary className="cursor-pointer p-4 font-bold">Ver historial detallado de ventas</summary><div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className="bg-zinc-100 text-xs uppercase text-zinc-500"><tr><th className="p-3">Fecha / consecutivo</th><th className="p-3">Gremio</th><th className="p-3">Cajero</th><th className="p-3">Pago</th><th className="p-3">Compra</th><th className="p-3">Total</th><th className="p-3">Acción</th></tr></thead><tbody>{report.sales.map((sale) => <tr key={sale.saleKey} className="border-t align-top"><td className="p-3">{new Date(sale.createdAt).toLocaleString('es-CO')}<p className="mt-1 text-xs font-bold tracking-wider text-zinc-500">Código: {sale.barcode12 ?? 'No disponible'}</p></td><td className="p-3">{gremioLabels[sale.gremio] ?? sale.gremio}</td><td className="p-3">{sale.user?.name ?? 'Usuario'}</td><td className="p-3">{sale.paymentMethod}</td><td className="p-3"><details><summary className="cursor-pointer font-semibold text-vexora-700">Ver {sale.items?.length ?? 0} artículos</summary><ul className="mt-2 min-w-48 space-y-1 text-xs">{(sale.items ?? []).map((item, index) => <li key={`${item.name}-${index}`} className="flex justify-between gap-3"><span>{item.quantity} × {item.name}</span><span className="whitespace-nowrap">{money(item.price * item.quantity)}</span></li>)}</ul></details></td><td className="p-3 font-bold">{money(sale.total)}</td><td className="p-3"><button type="button" disabled={printingSaleKey === sale.saleKey} onClick={() => void reprintSale(sale)} className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-vexora-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-wait disabled:opacity-50"><Printer className="h-4 w-4" />{printingSaleKey === sale.saleKey ? 'Imprimiendo…' : 'Imprimir copia'}</button></td></tr>)}{!report.sales.length && <tr><td colSpan="7" className="p-8 text-center text-zinc-500">No hay ventas en el periodo seleccionado.</td></tr>}</tbody></table></div></details>
     </section>}
 
     {tab === 'accounting' && <section className="mt-5 space-y-5">

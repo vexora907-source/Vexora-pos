@@ -36,6 +36,8 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
   const canPrintThermalInvoice = ['PRO', 'VEXORA'].includes(canonicalPlan(String(tenant.plan ?? '').toUpperCase()))
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const saleKey = sale.saleKey ?? sale.id ?? sale._id ?? fallbackSaleKey.current
+  const hasSaleBarcode = typeof sale.barcode12 === 'string' && /^\d{12}$/.test(sale.barcode12)
+  const ticketCodeType = hasSaleBarcode ? 'BARCODE' : ticketSettings.tipoCodigo
   const printerTicket = {
     negocio: {
       nombre: business.name || businessName,
@@ -50,7 +52,7 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
     saleKey,
     barcode12: sale.barcode12 ?? '',
     verificationUrl: sale.verificationUrl ?? sale.qrUrl ?? '',
-    tipoCodigo: ticketSettings.tipoCodigo,
+    tipoCodigo: ticketCodeType,
     cliente: { nombre: customer.name },
     productos: items.map((item) => ({
       nombre: item.name,
@@ -159,7 +161,7 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
     if (!saleGremio || !ticketSettingsLoaded || autoPrintTriggered.current) return
     autoPrintTriggered.current = true
     void printSaleReceipt(false, false)
-  }, [saleGremio, saleKey, ticketSettingsLoaded, ticketSettings.tipoCodigo])
+  }, [saleGremio, saleKey, ticketSettingsLoaded, ticketCodeType])
 
   async function registerCustomer(event) {
     event.preventDefault()
@@ -207,7 +209,7 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
           <button type="button" onClick={onClose} aria-label="Cerrar comprobante" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 print:hidden"><X className="h-4 w-4" /></button>
         </header>
         <div className="max-h-[58vh] overflow-y-auto rounded-lg">
-          <TicketPro datos={{ ...printerTicket, businessName: business.name || businessName, customer, items, total, createdAt: sale.createdAt ?? sale.occurredAt, isDianInvoice: Boolean(dian?.enabled) }} tipoCodigo={ticketSettings.tipoCodigo} />
+          <TicketPro datos={{ ...printerTicket, businessName: business.name || businessName, customer, items, total, createdAt: sale.createdAt ?? sale.occurredAt, isDianInvoice: Boolean(dian?.enabled) }} tipoCodigo={ticketCodeType} />
         </div>
         <section className="mt-3 rounded-xl border border-slate-200 bg-white p-3 print:hidden">
           <label className="block text-xs font-bold text-slate-600">Cliente para el comprobante
