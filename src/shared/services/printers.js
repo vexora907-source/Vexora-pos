@@ -68,7 +68,13 @@ async function rasterizeLogo(source) {
 async function preparePrintableTicket(gremio, target, ticket) {
   const prepared = await prepareTicketForPrinting(gremio, ticket)
   if (target === 'caja' && prepared.negocio?.logo) {
-    const raster = await rasterizeLogo(prepared.negocio.logo)
+    const logo = isDemoMode()
+      ? prepared.negocio.logo
+      : (await apiRequest(`/api/printers/${encodeURIComponent(gremio)}/ticket-logo`)).logoData
+    if (typeof logo !== 'string' || !logo.startsWith('data:image/')) {
+      throw new Error('El backend no devolvió una imagen válida para imprimir el logo.')
+    }
+    const raster = await rasterizeLogo(logo)
     prepared.negocio = {
       ...prepared.negocio,
       logoRaster: { width: raster.width, height: raster.height, data: raster.data },
