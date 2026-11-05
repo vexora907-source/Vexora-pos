@@ -9,6 +9,7 @@ export const GREMIOS = [
   { id: 'tienda', name: 'Tienda / Mini market', icon: '🛒', desc: 'Abarrotes, granel y fiados', color: 'blue', detail: 'Venta rápida, vencimientos y proveedores' },
   { id: 'ropa', name: 'Almacén de ropa', icon: '👕', desc: 'Prendas por talla y color', color: 'zinc', detail: 'Variantes, apartados y cambios' },
   { id: 'comidas_rapidas', name: 'Comidas rápidas', icon: '🍟', desc: 'Mesas, cocina y domicilios', color: 'amber', detail: 'Comandas, ingredientes y entregas' },
+  { id: 'otros', name: 'Otros', icon: '🏪', desc: 'Otro tipo de negocio', color: 'zinc', detail: 'Personaliza el nombre y usa el POS general' },
 ]
 
 const styles = {

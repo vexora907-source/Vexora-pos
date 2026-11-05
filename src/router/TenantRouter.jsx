@@ -20,6 +20,7 @@ import FerreteriaPOS from '../pos/ferreteria/FerreteriaPOS.jsx'
 import TiendaPOS from '../pos/tienda/TiendaPOS.jsx'
 import RopaPOS from '../pos/ropa/RopaPOS.jsx'
 import ComidasRapidasPOS from '../pos/comidas_rapidas/ComidasRapidasPOS.jsx'
+import OtrosPOS from '../pos/otros/OtrosPOS.jsx'
 import { LicenseBlocked } from '../shared/components/LicenseBlocked.jsx'
 import { CashRegister } from '../shared/components/CashRegister/CashRegister.jsx'
 import { fetchLicenseStatus } from '../shared/services/licenseService.js'
@@ -40,14 +41,18 @@ import { listenForCustomerDisplayRequests } from '../shared/services/customerDis
 import { hasSeenTutorial, tutorialStorageKey } from '../shared/services/tutorial.js'
 import { API_URL } from '../shared/services/api.js'
 
-const views = { papeleria: PapeleriaPOS, cerrajeria: CerrajeriaPOS, restaurante: RestaurantePOS, ferreteria: FerreteriaPOS, tienda: TiendaPOS, ropa: RopaPOS, comidas_rapidas: ComidasRapidasPOS }
+const views = { papeleria: PapeleriaPOS, cerrajeria: CerrajeriaPOS, restaurante: RestaurantePOS, ferreteria: FerreteriaPOS, tienda: TiendaPOS, ropa: RopaPOS, comidas_rapidas: ComidasRapidasPOS, otros: OtrosPOS }
 const gremioLabels = { papeleria: '📚 Papelería', cerrajeria: '🔑 Cerrajería', restaurante: '🍔 Restaurante', ferreteria: '🔧 Ferretería', tienda: '🛒 Tienda', ropa: '👕 Ropa', comidas_rapidas: '🍟 Comidas rápidas' }
 
-function MultiGremioSwitcher({ gremios, activeGremio, onSelect }) {
+function getGremioLabel(id, customGremioName) {
+  return id === 'otros' ? customGremioName || 'Otros' : gremioLabels[id] ?? id
+}
+
+function MultiGremioSwitcher({ gremios, activeGremio, onSelect, customGremioName }) {
   return (
     <nav className="flex flex-wrap items-center gap-2 rounded-2xl border border-zinc-200 bg-white p-2">
       {gremios.map((id) => {
-        const label = gremioLabels[id] ?? id
+        const label = getGremioLabel(id, customGremioName)
         return <button key={id} type="button" onClick={() => onSelect(id)} aria-pressed={activeGremio === id} className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${activeGremio === id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}>{label}</button>
       })}
       <a href="/billing" className="ml-auto rounded-xl px-3 py-2.5 text-sm font-semibold text-vexora-700 hover:bg-vexora-50">Plan y facturación</a>
@@ -71,7 +76,7 @@ function DemoGremioManager({ gremios, onToggle }) {
 
 export default function TenantRouter() {
   const tenant = useTenantGremio()
-  const { gremios, activeGremio, setActiveGremio, setGremios } = tenant
+  const { gremios, activeGremio, setActiveGremio, setGremios, customGremioName } = tenant
   const role = tenant.user?.role
   const canAdmin = role === 'OWNER' || role === 'SUPER_ADMIN'
   const accessibleGremios = role === 'COCINA'
@@ -132,7 +137,7 @@ export default function TenantRouter() {
   function logout() {
     const openRegisters = gremios.filter((gremio) => readCashRegister(gremio)?.isOpen)
     if (openRegisters.length > 0) {
-      const labels = openRegisters.map((gremio) => gremioLabels[gremio] ?? gremio).join(', ')
+      const labels = openRegisters.map((gremio) => getGremioLabel(gremio, customGremioName)).join(', ')
       const confirmed = window.confirm(
         `Tienes caja(s) abierta(s): ${labels}.\n\n¿Quieres cerrar sesión sin cerrar la caja? La caja y sus ventas se conservarán abiertas para cuando vuelvas a ingresar.`,
       )
@@ -263,7 +268,7 @@ export default function TenantRouter() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-6"><a href="/" className="font-black tracking-tight">VEXORA <span className="text-vexora-600">POS</span></a><div className="flex flex-wrap items-center justify-end gap-3">{role !== 'COCINA' && <><a href="/billing" className="text-sm font-semibold text-vexora-700 hover:text-vexora-900">Plan y facturación</a>{canAdmin && <a href="/publicidad" className="text-sm font-semibold text-violet-700 hover:text-violet-900">Mi publicidad</a>}</>}<p className="hidden text-xs font-medium text-zinc-500 sm:block">{tenant.isDemo ? 'Espacio de negocio · Vista de demostración' : `Negocio · ${tenant.business?.name ?? tenant.business?.email ?? ''}`}</p>{tenant.user?.userCode && <p className="text-xs font-semibold text-zinc-700">Código de usuario: {tenant.user.userCode}</p>}<button type="button" onClick={logout} className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-3 py-2 text-sm font-bold text-zinc-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"><LogOut className="h-4 w-4" />{tenant.isDemo ? 'Cambiar a cuenta de pruebas' : 'Cerrar sesión'}</button></div></header>
-      {accessibleGremios.length > 1 && <div className="mx-auto max-w-[1500px] px-4 pt-4 sm:px-6"><MultiGremioSwitcher gremios={accessibleGremios} activeGremio={effectiveGremio} onSelect={setActiveGremio} /></div>}
+      {accessibleGremios.length > 1 && <div className="mx-auto max-w-[1500px] px-4 pt-4 sm:px-6"><MultiGremioSwitcher gremios={accessibleGremios} activeGremio={effectiveGremio} onSelect={setActiveGremio} customGremioName={customGremioName} /></div>}
       {!tenant.isDemo && tenant.user && <OfflineStatus />}
       {cashSyncMessage && <p role="alert" className="mx-auto mt-3 max-w-[1500px] px-4 text-sm font-semibold text-amber-800 sm:px-6">{cashSyncMessage}</p>}
       {tenant.isDemo && <div className="mx-auto max-w-[1500px] px-4 pt-3 sm:px-6">

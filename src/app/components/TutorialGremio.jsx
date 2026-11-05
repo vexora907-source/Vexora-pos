@@ -67,7 +67,9 @@ export function TutorialGremio({ tenant, gremio, plan: planValue, onClose }) {
     onClose()
   }
 
-  const gremioName = gremio.replaceAll('_', ' ')
+  const gremioName = gremio === 'otros'
+    ? tenant.customGremioName || 'Otros'
+    : gremio.replaceAll('_', ' ')
 
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-zinc-950/70 p-4">

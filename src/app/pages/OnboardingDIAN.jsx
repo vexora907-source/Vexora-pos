@@ -31,6 +31,7 @@ export default function OnboardingDIAN() {
           password: draft.password,
           privacyConsent: draft.privacyConsent,
           gremios: tenant.gremios,
+          customGremioName: tenant.customGremioName ?? '',
           planId: 'INICIO',
           dianEnabled: false,
           dianNit: draft.dianNit,
@@ -54,6 +55,7 @@ export default function OnboardingDIAN() {
             address: result.tenant.address,
           },
           gremios: result.tenant.gremios,
+          customGremioName: result.tenant.customGremioName ?? '',
           dian: result.tenant.dian,
           plan: 'INICIO',
           user: result.user,
@@ -89,7 +91,7 @@ export default function OnboardingDIAN() {
           </div>}
           <button type="button" disabled={busy} onClick={() => void finishRegistration()} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-vexora-600 px-5 py-4 font-bold text-white hover:bg-vexora-700 disabled:opacity-50">{busy ? 'Creando cuenta…' : 'Iniciar mis 15 días gratis'} <ArrowRight className="h-5 w-5" /></button>
         </section>
-        <p className="mt-5 flex items-center justify-center gap-2 text-center text-xs text-zinc-400"><Check className="h-4 w-4" />{tenant.gremios.length} gremio(s) seleccionados: {tenant.gremios.join(', ') || 'ninguno'}</p>
+        <p className="mt-5 flex items-center justify-center gap-2 text-center text-xs text-zinc-400"><Check className="h-4 w-4" />{tenant.gremios.length} gremio(s) seleccionados: {tenant.gremios.map((gremio) => gremio === 'otros' ? tenant.customGremioName || 'Otros' : gremio).join(', ') || 'ninguno'}</p>
       </div>
     </main>
   )

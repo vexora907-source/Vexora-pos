@@ -13,7 +13,7 @@ import { printReceipt } from '../../shared/services/printers.js'
 import { getTicketConfiguration, mapTicketBusiness } from '../../shared/services/ticketCode.js'
 import { readTenant } from '../../shared/services/tenantStorage.js'
 
-const gremioLabels = { papeleria: 'Papelería', cerrajeria: 'Cerrajería', restaurante: 'Restaurante', ferreteria: 'Ferretería', tienda: 'Tienda', ropa: 'Ropa', comidas_rapidas: 'Comidas rápidas' }
+const gremioLabels = { papeleria: 'Papelería', cerrajeria: 'Cerrajería', restaurante: 'Restaurante', ferreteria: 'Ferretería', tienda: 'Tienda', ropa: 'Ropa', comidas_rapidas: 'Comidas rápidas', otros: 'Otros' }
 const allGremios = Object.keys(gremioLabels)
 const dateValue = (date) => date.toISOString().slice(0, 10)
 const money = (value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value ?? 0)
@@ -518,9 +518,10 @@ function LicenseRow({ license, onSave }) {
   function toggle(id) {
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : current.length < 3 ? [...current, id] : current)
   }
+  const tenantGremioLabels = { ...gremioLabels, otros: tenant.customGremioName || 'Otros' }
   return <article className="rounded-2xl border bg-white p-5">
     <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-black">{tenant.name}</h2><p className="text-sm text-zinc-500">{tenant.email} · {license.plan} · {license.status}</p></div><p className="text-xs text-zinc-500">Vence: {license.validUntil ? new Date(license.validUntil).toLocaleDateString('es-CO') : 'sin vigencia'}</p></header>
-    <fieldset className="mt-4"><legend className="text-sm font-bold">Gremios asignados (máximo 3)</legend><div className="mt-2 flex flex-wrap gap-2">{allGremios.map((id) => <label key={id} className="rounded-lg border px-3 py-2 text-sm"><input type="checkbox" checked={selected.includes(id)} disabled={!selected.includes(id) && selected.length >= 3} onChange={() => toggle(id)} /> <span className="ml-1">{gremioLabels[id]}</span></label>)}</div></fieldset>
+    <fieldset className="mt-4"><legend className="text-sm font-bold">Gremios asignados (máximo 3)</legend><div className="mt-2 flex flex-wrap gap-2">{allGremios.map((id) => <label key={id} className="rounded-lg border px-3 py-2 text-sm"><input type="checkbox" checked={selected.includes(id)} disabled={!selected.includes(id) && selected.length >= 3} onChange={() => toggle(id)} /> <span className="ml-1">{tenantGremioLabels[id]}</span></label>)}</div></fieldset>
     <button type="button" disabled={!selected.length} onClick={() => onSave(license, selected)} className="mt-4 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">Guardar asignación</button>
   </article>
 }

@@ -691,7 +691,7 @@ export default function Configuration() {
     </div>
 
     {tenant.gremios?.length > 1 && <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl bg-slate-50 p-3">
-      <label className="text-sm font-semibold text-slate-700">Gremio<select value={gremio} onChange={(event) => setGremio(event.target.value)} className="ml-2 rounded-xl border bg-white px-3 py-2 text-sm font-medium shadow-sm">{tenant.gremios.map((id) => <option key={id} value={id}>{id.replaceAll('_', ' ')}</option>)}</select></label>
+      <label className="text-sm font-semibold text-slate-700">Gremio<select value={gremio} onChange={(event) => setGremio(event.target.value)} className="ml-2 rounded-xl border bg-white px-3 py-2 text-sm font-medium shadow-sm">      {tenant.gremios.map((id) => <option key={id} value={id}>{id === 'otros' ? tenant.customGremioName || 'Otros' : id.replaceAll('_', ' ')}</option>)}</select></label>
     </div>}
 
     <div className="mt-6 flex flex-wrap gap-2 rounded-2xl bg-slate-100 p-2 shadow-inner">

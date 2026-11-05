@@ -51,6 +51,7 @@ export default function Register() {
     }
     saveTenant({
       business,
+      customGremioName: '',
     })
     window.location.assign('/onboarding')
   }
