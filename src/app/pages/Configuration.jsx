@@ -571,7 +571,8 @@ export default function Configuration() {
         onTest={() => void testPrinter('cocina')}
       />}
       <Toggle label="Abrir cajón al vender" checked={config.hardware.abrirCajon} onChange={(event) => update('hardware', 'abrirCajon', event.target.checked)} />
-      <Toggle label="Activar segunda pantalla para clientes" checked={config.hardware.segundaPantalla} onChange={(event) => update('hardware', 'segundaPantalla', event.target.checked)} />
+      <Toggle label="Habilitar pantalla para clientes" checked={config.hardware.segundaPantalla} onChange={(event) => update('hardware', 'segundaPantalla', event.target.checked)} />
+      <p className="text-sm text-zinc-600">Guarda esta opción y abre “Pantalla del cliente” desde el punto de venta. Si el navegador detecta un monitor adicional, intentará ubicar allí la ventana; si no, la abrirá en otra pestaña o ventana. La publicidad muestra únicamente campañas aprobadas y vigentes para este negocio.</p>
       <p className="text-sm text-zinc-600">USB envía comandos ESC/POS directamente desde Chrome o Edge. Firefox, Safari y los navegadores sin USB/Serial imprimen mediante el diálogo del sistema usando el controlador instalado. Pulsa “Probar impresión” para elegir y autorizar la impresora USB en navegadores compatibles. La autorización USB se comparte entre los gremios de este navegador, pero debes activar la impresión automática en cada gremio. La impresión por red usa el backend y el puerto fijo 9100. Lector de código de barras: USB.</p>
     </div>
     if (tab === 'impuestos') return <div className="space-y-5">

@@ -19,6 +19,7 @@ import { connectRealtimeSocket } from '../../shared/services/realtime.js'
 import { printConfiguredUsbTicket, printReceipt } from '../../shared/services/printers.js'
 import { appStorage, isDemoMode } from '../../shared/services/tenantStorage.js'
 import { formatCOP } from '../../shared/services/ticket.js'
+import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
 import { API_URL } from '../../shared/services/api.js'
 
 const ingredients = [
@@ -422,6 +423,7 @@ export default function ComidasRapidasPOS({ kitchenOnly = false }) {
     return true
   }), [filteredMenu, menuMode])
   const total = cart.reduce((sum, line) => sum + line.price * line.quantity, 0)
+  useCustomerDisplay({ gremio: 'comidas_rapidas', items: cart, total, enabled: !kitchenOnly })
   const activeOrders = orders.filter((order) => order.kitchenState !== 'delivered' || (order.type === 'delivery' && order.deliveryState !== 'delivered'))
   const currentFloor = floors.find((floor) => floor.id === floorId) ?? floors[0]
   const floorTables = tables

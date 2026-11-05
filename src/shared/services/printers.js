@@ -297,8 +297,12 @@ export async function getPrinterConfig(gremio) {
   if (isDemoMode()) {
     const config = JSON.parse(appStorage().getItem(`${DEMO_CONFIG_KEY}:${gremio}`) ?? 'null')
     return config?.hardware
-      ? { caja: config.hardware.impresoraCaja, cocina: config.hardware.impresoraCocina }
-      : { caja: { tipo: 'usb', imprimirAutomaticamente: false }, cocina: { tipo: 'usb', imprimirAutomaticamente: false } }
+      ? {
+        caja: config.hardware.impresoraCaja,
+        cocina: config.hardware.impresoraCocina,
+        segundaPantalla: config.hardware.segundaPantalla === true,
+      }
+      : { caja: { tipo: 'usb', imprimirAutomaticamente: false }, cocina: { tipo: 'usb', imprimirAutomaticamente: false }, segundaPantalla: false }
   }
   return apiRequest(`/api/printers/${encodeURIComponent(gremio)}/config`).then((result) => result.printers)
 }

@@ -34,6 +34,9 @@ import { TutorialGremio } from '../app/components/TutorialGremio.jsx'
 import { SupportBubble } from '../shared/components/SupportBubble.jsx'
 import MiPublicidad from '../app/pages/MiPublicidad.jsx'
 import { AdvertisingBanner } from '../shared/components/AdvertisingBanner.jsx'
+import CustomerDisplay from '../shared/components/CustomerDisplay.jsx'
+import { CustomerDisplayLauncher } from '../shared/components/CustomerDisplayLauncher.jsx'
+import { listenForCustomerDisplayRequests } from '../shared/services/customerDisplay.js'
 import { hasSeenTutorial, tutorialStorageKey } from '../shared/services/tutorial.js'
 import { API_URL } from '../shared/services/api.js'
 
@@ -208,10 +211,19 @@ export default function TenantRouter() {
     void verifyLicense()
   }, [path, verifyLicense])
 
+  useEffect(() => {
+    if (path !== '/pos') return undefined
+    return listenForCustomerDisplayRequests(tenant)
+  }, [path, tenant.business?.email, tenant.business?.id, tenant.business?._id, tenant.business?.name])
+
   if (path === '/recuperar-contrasena') return <ForgotPassword />
   if (path === '/restablecer-contrasena') return <ResetPassword />
   if (role === 'COCINA' && path !== '/pos') {
     return <main className="grid min-h-screen place-items-center bg-zinc-50 p-6"><section className="max-w-md rounded-2xl border bg-white p-6 text-center"><h1 className="text-xl font-black">Acceso de cocina</h1><p className="mt-2 text-sm text-zinc-600">Esta cuenta solo puede consultar y actualizar las comandas de comidas rápidas.</p><button type="button" onClick={logout} className="mt-5 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white">Cerrar sesión</button></section></main>
+  }
+  if (path === '/customer-display') {
+    const url = new URL(window.location.href)
+    return <CustomerDisplay gremio={url.searchParams.get('gremio') ?? ''} sourceId={url.searchParams.get('sourceId') ?? ''} />
   }
   if (path === '/register') return <Register />
   if (path === '/login') return <Login />
@@ -267,7 +279,10 @@ export default function TenantRouter() {
           }
         }} />}
       </div>}
-      {canAdmin && <div className="mx-auto flex max-w-[1500px] gap-2 px-4 pt-3 sm:px-6"><a href="/pos/admin" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-vexora-500">Panel administrativo</a><a href="/configuracion" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-vexora-500">Configuración</a></div>}
+      <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-2 px-4 pt-3 sm:px-6">
+        {canAdmin && <><a href="/pos/admin" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-vexora-500">Panel administrativo</a><a href="/configuracion" className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-700 hover:border-vexora-500">Configuración</a></>}
+        {role !== 'COCINA' && <CustomerDisplayLauncher gremio={effectiveGremio} />}
+      </div>
       {role !== 'COCINA' && <div className="mx-auto max-w-[1500px] px-4 pt-4 sm:px-6"><DianStatus dian={tenant.dian} /></div>}
       {role !== 'COCINA' && <nav aria-label="Secciones del negocio" className="mx-auto mt-4 flex max-w-[1500px] gap-2 px-4 sm:px-6">
         <button type="button" aria-pressed={posSection === 'sales'} onClick={() => setPosSection('sales')} className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${posSection === 'sales' ? 'bg-vexora-600 text-white' : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-100'}`}><ShoppingBag className="h-4 w-4" />Punto de venta</button>

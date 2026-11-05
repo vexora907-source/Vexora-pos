@@ -10,6 +10,7 @@ import { useInventory } from '../../shared/hooks/useInventory.js'
 import { InventoryManager } from '../../shared/components/Inventory/InventoryManager.jsx'
 import { EmptyInventoryState } from '../../shared/components/Inventory/EmptyInventoryState.jsx'
 import { assertCashRegisterOpen, recordCashSale } from '../../shared/services/cashRegister.js'
+import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
 
 const initialProducts = [
   { id: 'cuaderno', barcode: '7701000000028', name: 'Cuaderno cosido', category: 'Escolar', price: 4500, stock: 18, icon: '📒', tone: 'bg-amber-100' },
@@ -30,6 +31,7 @@ export default function PapeleriaPOS() {
   const [scanMessage, setScanMessage] = useState('')
   const [inventoryOpen, setInventoryOpen] = useState(false)
   const filtered = useMemo(() => products.filter((product) => `${product.name} ${product.category} ${product.id}`.toLowerCase().includes(query.toLowerCase())), [products, query])
+  useCustomerDisplay({ gremio: 'papeleria', items: cart })
 
   function add(product) {
     setCart((current) => {

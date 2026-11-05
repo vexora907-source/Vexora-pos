@@ -16,6 +16,7 @@ import { menuItems } from './components/MenuGrid.jsx'
 import { useInventory } from '../../shared/hooks/useInventory.js'
 import { InventoryManager } from '../../shared/components/Inventory/InventoryManager.jsx'
 import { EmptyInventoryState } from '../../shared/components/Inventory/EmptyInventoryState.jsx'
+import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
 import { assertCashRegisterOpen, recordCashSale } from '../../shared/services/cashRegister.js'
 import { apiRequest } from '../../shared/services/api.js'
 import { connectRealtimeSocket } from '../../shared/services/realtime.js'
@@ -78,6 +79,7 @@ export default function RestaurantePOS() {
   const floorTables = tables.filter((table) => table.floorId === currentFloor?.id)
   const table = tables.find((item) => item.id === tableId && item.floorId === currentFloor?.id) ?? floorTables[0]
   const total = useMemo(() => table?.items.reduce((sum, item) => sum + item.price * item.quantity, 0) ?? 0, [table])
+  useCustomerDisplay({ gremio: 'restaurante', items: table?.items ?? [], total })
 
   function updateTables(updater) {
     updateData((current) => ({

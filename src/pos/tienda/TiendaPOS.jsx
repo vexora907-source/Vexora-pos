@@ -12,6 +12,7 @@ import { useInventory } from '../../shared/hooks/useInventory.js'
 import { assertCashRegisterOpen, recordCashSale } from '../../shared/services/cashRegister.js'
 import { appStorage, isDemoMode } from '../../shared/services/tenantStorage.js'
 import { API_URL } from '../../shared/services/api.js'
+import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
 
 const initialProducts = [
   { id: 'arroz', barcode: '7701000000103', name: 'Arroz por libra', category: 'Granos', price: 2400, quantity: 38, icon: '🍚', unit: 'lb' },
@@ -156,6 +157,7 @@ export default function TiendaPOS() {
     return matchesQuery && (category === 'Todos' || (product.category || 'General') === category)
   }), [products, query, category])
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  useCustomerDisplay({ gremio: 'tienda', items: cart, total })
 
   function add(product) {
     setCart((current) => {

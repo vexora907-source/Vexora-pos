@@ -10,6 +10,7 @@ import { TicketFacturaElectronica } from '../DianModule/TicketFacturaElectronica
 import TicketPro from './TicketPro.jsx'
 import { printReceipt } from '../../services/printers.js'
 import { canonicalPlan } from '../../../app/components/PricingCalculator.jsx'
+import { useCustomerDisplay } from '../../hooks/useCustomerDisplay.js'
 
 export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue, dian, gremio, sale = {}, businessName = 'Vexora POS', paperWidth = 80, onClose = () => {}, onIssued = () => {} }) {
   const tenant = useTenantGremio()
@@ -35,6 +36,14 @@ export function SaleReceipt({ items = [], paymentMethod, cashReceived, changeDue
   const demo = isDemoMode()
   const canPrintThermalInvoice = ['PRO', 'VEXORA'].includes(canonicalPlan(String(tenant.plan ?? '').toUpperCase()))
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  useCustomerDisplay({
+    gremio: saleGremio,
+    items,
+    total,
+    status: 'receipt',
+    customerName: customer.name,
+    paymentMethod,
+  })
   const saleKey = sale.saleKey ?? sale.id ?? sale._id ?? fallbackSaleKey.current
   const hasSaleBarcode = typeof sale.barcode12 === 'string' && /^\d{12}$/.test(sale.barcode12)
   const ticketCodeType = hasSaleBarcode ? 'BARCODE' : ticketSettings.tipoCodigo

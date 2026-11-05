@@ -13,12 +13,14 @@ import { registerSale } from '../../shared/services/sales.js'
 import { isDemoMode } from '../../shared/services/tenantStorage.js'
 import { EmptyInventoryState } from '../../shared/components/Inventory/EmptyInventoryState.jsx'
 import { formatCOP } from '../../shared/services/ticket.js'
+import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
 
 const initialInventory = [
   { id: 'key-blank', name: 'Llaves en bruto', category: 'Insumos', price: 0, quantity: 40, icon: '🗝️' },
   { id: 'cylinder', name: 'Cilindros de repuesto', category: 'Repuestos', price: 0, quantity: 8, icon: '🔐' },
   { id: 'lock', name: 'Cerraduras', category: 'Repuestos', price: 0, quantity: 6, icon: '🔒' },
 ]
+const EMPTY_DISPLAY_ITEMS = []
 
 export default function CerrajeriaPOS() {
   const { dian, business } = useTenantGremio()
@@ -30,6 +32,9 @@ export default function CerrajeriaPOS() {
   const [message, setMessage] = useState('')
   const [inventoryOpen, setInventoryOpen] = useState(false)
   const [cart, setCart] = useState([])
+  const displayItems = cart.length ? cart : pendingOrder ? [{ name: pendingOrder.service, price: pendingOrder.price, quantity: 1 }] : EMPTY_DISPLAY_ITEMS
+  const displayTotal = displayItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  useCustomerDisplay({ gremio: 'cerrajeria', items: displayItems, total: displayTotal })
   function addToCart(product) {
     if (Number(product.quantity ?? product.stock) < 1) {
       setMessage(`No hay existencias de ${product.name}.`)

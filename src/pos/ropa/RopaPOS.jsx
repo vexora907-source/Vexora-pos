@@ -13,6 +13,7 @@ import { getAuthToken } from '../../shared/services/auth.js'
 import { appStorage, isDemoMode } from '../../shared/services/tenantStorage.js'
 import { formatCOP } from '../../shared/services/ticket.js'
 import { API_URL } from '../../shared/services/api.js'
+import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
 
 const initialProducts = [
   {
@@ -181,6 +182,7 @@ export default function RopaPOS() {
     return matchesCategory && content.includes(query.toLowerCase())
   }), [products, category, query])
   const cartTotal = totalOf(cart)
+  useCustomerDisplay({ gremio: 'ropa', items: cart, total: cartTotal })
   const activeLayaway = layaways.find((item) => item.id === layawayId)
   const remainingLayaway = activeLayaway ? activeLayaway.total - activeLayaway.paid : 0
   const exchangeProduct = products.find((product) => product.id === exchangeProductId)

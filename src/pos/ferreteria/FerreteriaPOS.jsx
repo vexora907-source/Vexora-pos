@@ -9,6 +9,7 @@ import { useInventory } from '../../shared/hooks/useInventory.js'
 import { InventoryManager } from '../../shared/components/Inventory/InventoryManager.jsx'
 import { EmptyInventoryState } from '../../shared/components/Inventory/EmptyInventoryState.jsx'
 import { assertCashRegisterOpen, recordCashSale } from '../../shared/services/cashRegister.js'
+import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
 
 const initialStock = [
   { id: 'drill', name: 'Taladro percutor', category: 'Herramientas', price: 189000, quantity: 8, icon: '🛠️' },
@@ -30,6 +31,7 @@ export default function FerreteriaPOS() {
   const cartRef = useRef(null)
   const filtered = useMemo(() => stock.filter((product) => `${product.name} ${product.category}`.toLowerCase().includes(query.toLowerCase())), [stock, query])
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  useCustomerDisplay({ gremio: 'ferreteria', items: cart, total })
   function add(product) {
     const available = Number(product.quantity ?? product.stock ?? 0)
     if (available < 1) {
