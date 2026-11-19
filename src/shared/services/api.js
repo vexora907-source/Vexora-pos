@@ -18,7 +18,11 @@ export async function apiRequest(path, options = {}) {
 
   let response
   try {
-    response = await fetch(new URL(path, API_URL), { ...options, headers })
+    response = await fetch(new URL(path, API_URL), {
+      ...options,
+      cache: options.cache ?? 'no-store',
+      headers,
+    })
   } catch (cause) {
     throw new Error('No fue posible completar la solicitud. Inténtalo de nuevo más tarde.', { cause })
   }
@@ -35,6 +39,9 @@ export async function apiRequest(path, options = {}) {
   if (!response.ok) {
     const error = new Error(result?.message ?? result?.error ?? `La solicitud falló (${response.status}).`)
     error.status = response.status
+    if (response.status === 401 && headers.has('Authorization') && !path.startsWith('/api/auth/')) {
+      window.dispatchEvent(new Event('vexora:session-expired'))
+    }
     throw error
   }
   return result

@@ -11,6 +11,7 @@ import { InventoryManager } from '../../shared/components/Inventory/InventoryMan
 import { EmptyInventoryState } from '../../shared/components/Inventory/EmptyInventoryState.jsx'
 import { assertCashRegisterOpen, recordCashSale } from '../../shared/services/cashRegister.js'
 import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
+import { usePersistentCart } from '../../shared/hooks/usePersistentCart.js'
 
 const initialProducts = [
   { id: 'cuaderno', barcode: '7701000000028', name: 'Cuaderno cosido', category: 'Escolar', price: 4500, stock: 18, icon: '📒', tone: 'bg-amber-100' },
@@ -25,7 +26,7 @@ export default function PapeleriaPOS() {
   const { dian, business } = useTenantGremio()
   const { products, allProducts, addProduct, importProducts, adjustStock, updateProduct, deleteProduct, loadSampleInventory, validateSale, recordSale, loading: inventoryLoading, error: inventoryError, remote: inventoryRemote } = useInventory('papeleria', initialProducts)
   const [query, setQuery] = useState('')
-  const [cart, setCart] = useState([])
+  const [cart, setCart] = usePersistentCart('papeleria')
   const [paymentMethod, setPaymentMethod] = useState('')
   const [ticket, setTicket] = useState(null)
   const [scanMessage, setScanMessage] = useState('')
@@ -61,6 +62,7 @@ export default function PapeleriaPOS() {
     }
     setPaymentMethod(method)
     setTicket({ items: cart, sale, cashReceived: cashDetails?.cashReceived, changeDue: cashDetails?.changeDue })
+    setCart([])
   }
   function scanBarcode(event) {
     if (event.key !== 'Enter') return

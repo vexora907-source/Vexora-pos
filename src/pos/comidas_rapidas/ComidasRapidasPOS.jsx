@@ -20,6 +20,7 @@ import { printConfiguredUsbTicket, printReceipt } from '../../shared/services/pr
 import { appStorage, isDemoMode } from '../../shared/services/tenantStorage.js'
 import { formatCOP } from '../../shared/services/ticket.js'
 import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
+import { usePersistentCart } from '../../shared/hooks/usePersistentCart.js'
 import { API_URL } from '../../shared/services/api.js'
 
 const ingredients = [
@@ -266,6 +267,7 @@ async function quickMealsRequest(path, token, options = {}) {
   if (isDemoMode()) throw new Error('La cuenta demo no se conecta al backend.')
   const response = await fetch(new URL(path, API_URL), {
     ...options,
+    cache: options.cache ?? 'no-store',
     headers: {
       Authorization: `Bearer ${token}`,
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
@@ -290,7 +292,7 @@ export default function ComidasRapidasPOS({ kitchenOnly = false }) {
   const [customer, setCustomer] = useState('')
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
-  const [cart, setCart] = useState([])
+  const [cart, setCart] = usePersistentCart('comidas_rapidas')
   const [menuMode, setMenuMode] = useState('all')
   const [selectedMenuItem, setSelectedMenuItem] = useState(null)
   const [selectedModifiers, setSelectedModifiers] = useState([])

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChefHat, LayoutGrid, PackagePlus, PencilRuler, Utensils } from 'lucide-react'
 import { FloorPlan } from './components/floor/FloorPlan.jsx'
 import { FloorSelector } from './components/floor/FloorSelector.jsx'
@@ -21,17 +21,34 @@ import { assertCashRegisterOpen, recordCashSale } from '../../shared/services/ca
 import { apiRequest } from '../../shared/services/api.js'
 import { connectRealtimeSocket } from '../../shared/services/realtime.js'
 import { printConfiguredUsbTicket } from '../../shared/services/printers.js'
+import { appStorage, isDemoMode } from '../../shared/services/tenantStorage.js'
 
 function newLineId() {
   return globalThis.crypto?.randomUUID?.() ?? `line-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
+function readTableSelection(storageKey) {
+  try {
+    const selection = JSON.parse(appStorage().getItem(`${storageKey}:selection`) ?? '{}')
+    if (!selection || typeof selection !== 'object' || Array.isArray(selection)) {
+      throw new Error('La selección guardada no tiene el formato esperado.')
+    }
+    return selection
+  } catch (error) {
+    console.error('No se pudo recuperar la mesa seleccionada.', error)
+    return {}
+  }
+}
+
 export default function RestaurantePOS() {
   const { dian, business } = useTenantGremio()
-  const { floors, tables, designed, updateData } = useTableSocket()
+  const { floors, tables, designed, updateData, storageKey } = useTableSocket()
   const { products: dishes, allProducts, addProduct, importProducts, adjustStock, updateProduct, deleteProduct, loadSampleInventory, validateSale, recordSale, loading: inventoryLoading, error: inventoryError, remote: inventoryRemote } = useInventory('restaurante', menuItems.map((item) => ({ ...item, quantity: 50, category: 'Menú' })))
-  const [floorId, setFloorId] = useState('interior')
-  const [tableId, setTableId] = useState(1)
+  const [savedTableSelection] = useState(() => readTableSelection(storageKey))
+  const [floorId, setFloorId] = useState(() => floors.some((floor) => floor.id === savedTableSelection.floorId)
+    ? savedTableSelection.floorId
+    : floors.find((floor) => floor.id === 'interior')?.id ?? floors[0]?.id ?? 'interior')
+  const [tableId, setTableId] = useState(() => tables.find((item) => item.id === savedTableSelection.tableId)?.id ?? tables[0]?.id ?? 1)
   const [designOpen, setDesignOpen] = useState(!designed)
   const [kitchenOpen, setKitchenOpen] = useState(false)
   const [paying, setPaying] = useState(false)
@@ -39,8 +56,11 @@ export default function RestaurantePOS() {
   const [inventoryOpen, setInventoryOpen] = useState(false)
   const [dailyMenuOpen, setDailyMenuOpen] = useState(false)
   const [paymentError, setPaymentError] = useState('')
+  const [paymentWarning, setPaymentWarning] = useState('')
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false)
   const [kitchenError, setKitchenError] = useState('')
   const [readyNotice, setReadyNotice] = useState('')
+  const paymentInFlight = useRef(false)
 
   useEffect(() => {
     if (!inventoryRemote) return undefined
@@ -80,6 +100,14 @@ export default function RestaurantePOS() {
   const table = tables.find((item) => item.id === tableId && item.floorId === currentFloor?.id) ?? floorTables[0]
   const total = useMemo(() => table?.items.reduce((sum, item) => sum + item.price * item.quantity, 0) ?? 0, [table])
   useCustomerDisplay({ gremio: 'restaurante', items: table?.items ?? [], total })
+
+  useEffect(() => {
+    try {
+      appStorage().setItem(`${storageKey}:selection`, JSON.stringify({ floorId: currentFloor?.id, tableId: table?.id }))
+    } catch (error) {
+      console.error('No se pudo guardar la mesa seleccionada.', error)
+    }
+  }, [currentFloor?.id, floorId, storageKey, table?.id])
 
   function updateTables(updater) {
     updateData((current) => ({
@@ -121,6 +149,10 @@ export default function RestaurantePOS() {
     if (!table) return
     const pending = table.items.filter((line) => !line.sentAt)
     if (!pending.length) return
+    if (!inventoryRemote && !isDemoMode()) {
+      setKitchenError('La comanda no se envió: esta cuenta no está conectada al backend. Inicia sesión y vuelve a intentarlo.')
+      return
+    }
     const sentAt = new Date().toISOString()
     if (inventoryRemote) {
       try {
@@ -163,6 +195,10 @@ export default function RestaurantePOS() {
   }
 
   async function finishSale(paymentMethod, people, cashDetails) {
+    if (paymentInFlight.current) return
+    paymentInFlight.current = true
+    setPaymentSubmitting(true)
+    setPaymentError('')
     try {
       const soldItems = table.items.reduce((items, line) => {
         const existing = items.find((item) => item.id === line.id)
@@ -173,14 +209,30 @@ export default function RestaurantePOS() {
       validateSale(soldItems)
       assertCashRegisterOpen('restaurante', total)
       const sale = await recordSale(soldItems, paymentMethod)
-      recordCashSale('restaurante', total, paymentMethod)
+      const warnings = []
+      try {
+        recordCashSale('restaurante', total, paymentMethod)
+      } catch (error) {
+        warnings.push(error instanceof Error
+          ? `El cobro quedó registrado, pero no se pudo actualizar la caja: ${error.message}`
+          : 'El cobro quedó registrado, pero no se pudo actualizar la caja. No vuelvas a cobrarlo.')
+      }
       setReceipt({ table: { ...table }, paymentMethod, people, sale, cashReceived: cashDetails?.cashReceived, changeDue: cashDetails?.changeDue })
+      try {
+        settleTable(table.id)
+      } catch (error) {
+        warnings.push(error instanceof Error
+          ? `El cobro quedó registrado, pero no se pudo liberar esta mesa en el dispositivo: ${error.message}. No vuelvas a cobrarlo.`
+          : 'El cobro quedó registrado, pero no se pudo liberar esta mesa en el dispositivo. No vuelvas a cobrarlo.')
+      }
+      setPaymentWarning(warnings.join(' '))
+      setPaying(false)
     } catch (error) {
       setPaymentError(error instanceof Error ? error.message : 'No se pudo registrar el pago.')
-      return
+    } finally {
+      paymentInFlight.current = false
+      setPaymentSubmitting(false)
     }
-    setPaymentError('')
-    setPaying(false)
   }
 
   function settleTable(targetId) {
@@ -216,6 +268,7 @@ export default function RestaurantePOS() {
       {(inventoryLoading || inventoryError) && <p role={inventoryError ? 'alert' : 'status'} className={`mb-4 rounded-xl px-4 py-3 text-sm ${inventoryError ? 'bg-rose-50 text-rose-800' : 'bg-blue-50 text-blue-800'}`}>{inventoryError || 'Cargando inventario del negocio…'}</p>}
       {!dishes.length && !inventoryLoading && !inventoryError && <EmptyInventoryState onLoadSamples={loadSampleInventory} title="Aún no hay platos para vender" />}
       {kitchenError && <p role="alert" className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{kitchenError}</p>}
+      {paymentWarning && <p role="alert" className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{paymentWarning}</p>}
       {readyNotice && <p role="status" className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{readyNotice}</p>}
       <section className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-100 bg-white p-4">
         <FloorSelector floors={floors} selected={currentFloor?.id} onSelect={chooseFloor} />
@@ -229,13 +282,13 @@ export default function RestaurantePOS() {
           <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-950">Selecciona una mesa para abrir su detalle, agregar platos y enviar la comanda a cocina.</p>
         </section>
         <aside className="space-y-4">
-          {table && <TableDetail table={table} dishes={dishes} onAdd={addItem} onUpdateQuantity={updateQuantity} onRemove={removeItem} onSend={sendToKitchen} onPay={() => setPaying(true)} />}
+          {table && <TableDetail table={table} dishes={dishes} onAdd={addItem} onUpdateQuantity={updateQuantity} onRemove={removeItem} onSend={sendToKitchen} onPay={() => { setPaymentError(''); setPaymentWarning(''); setPaying(true) }} />}
           <AdCarousel gremio="restaurante" />
         </aside>
       </div>
       {designOpen && <TableDesigner floors={floors} tables={tables} onSave={saveDesign} onCancel={() => { updateData((current) => ({ ...current, designed: true })); setDesignOpen(false) }} />}
       {inventoryOpen && <InventoryManager title="Inventario y menú del restaurante" gremio="restaurante" products={allProducts} onAddProduct={addProduct} onImportProducts={importProducts} onAdjustStock={adjustStock} onUpdateProduct={updateProduct} onDeleteProduct={deleteProduct} onLoadSamples={loadSampleInventory} onClose={() => setInventoryOpen(false)} remote={inventoryRemote} loadError={inventoryError} />}
-      {paying && table && <PaymentTable table={table} total={total} error={paymentError} onCancel={() => { setPaying(false); setPaymentError('') }} onPay={finishSale} />}
+      {paying && table && <PaymentTable table={table} total={total} error={paymentError} submitting={paymentSubmitting} onCancel={() => { if (!paymentSubmitting) { setPaying(false); setPaymentError('') } }} onPay={finishSale} />}
       {receipt && <SaleReceipt items={receipt.table.items.map(({ lineId, note, ...item }) => ({ ...item, id: lineId, name: note ? `${item.name} · ${note}` : item.name }))} sale={receipt.sale} cashReceived={receipt.cashReceived} changeDue={receipt.changeDue} paymentMethod={receipt.paymentMethod} dian={dian} gremio="restaurante" businessName={business?.name} onIssued={() => settleTable(receipt.table.id)} onClose={() => { if (!dian?.enabled) settleTable(receipt.table.id); setReceipt(null) }} />}
     </main>
   )

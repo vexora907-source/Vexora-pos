@@ -20,6 +20,7 @@ import FerreteriaPOS from '../pos/ferreteria/FerreteriaPOS.jsx'
 import TiendaPOS from '../pos/tienda/TiendaPOS.jsx'
 import RopaPOS from '../pos/ropa/RopaPOS.jsx'
 import ComidasRapidasPOS from '../pos/comidas_rapidas/ComidasRapidasPOS.jsx'
+import { QuickMealsKitchen, RestaurantKitchen } from '../pos/restaurante/RestaurantKitchen.jsx'
 import OtrosPOS from '../pos/otros/OtrosPOS.jsx'
 import { LicenseBlocked } from '../shared/components/LicenseBlocked.jsx'
 import { CashRegister } from '../shared/components/CashRegister/CashRegister.jsx'
@@ -80,8 +81,9 @@ export default function TenantRouter() {
   const role = tenant.user?.role
   const canAdmin = role === 'OWNER' || role === 'SUPER_ADMIN'
   const accessibleGremios = role === 'COCINA'
-    ? gremios.filter((gremio) => gremio === 'comidas_rapidas' && gremio === tenant.user?.gremio)
+    ? gremios.filter((gremio) => ['comidas_rapidas', 'restaurante'].includes(gremio) && gremio === tenant.user?.gremio)
     : canAdmin ? gremios : gremios.filter((gremio) => gremio === tenant.user?.gremio)
+  const cashGremios = role === 'COCINA' ? [] : accessibleGremios
   const tutorialGremio = accessibleGremios.includes(activeGremio) ? activeGremio : accessibleGremios[0]
   const tutorialPlan = tenant.plan ?? 'INICIO'
   const tutorialKey = tutorialGremio ? tutorialStorageKey(tenant, tutorialGremio, tutorialPlan) : ''
@@ -150,6 +152,20 @@ export default function TenantRouter() {
   }
 
   useEffect(() => {
+    let redirected = false
+    const onSessionExpired = () => {
+      if (redirected) return
+      redirected = true
+      clearAuthToken()
+      clearRegistrationDraft()
+      clearTenant()
+      window.location.assign('/login')
+    }
+    window.addEventListener('vexora:session-expired', onSessionExpired)
+    return () => window.removeEventListener('vexora:session-expired', onSessionExpired)
+  }, [])
+
+  useEffect(() => {
     const onPopState = () => {
       const nextPath = window.location.pathname
       const signedIn = tenant.isDemo || Boolean(getAuthToken())
@@ -172,16 +188,17 @@ export default function TenantRouter() {
     }
   }, [path, tenant.isDemo])
 
-  const gremioKey = gremios.join('|')
+  const gremioKey = cashGremios.join('|')
   useEffect(() => {
-    if (tenant.isDemo || !API_URL || !getAuthToken() || !gremios.length) {
+    if (tenant.isDemo || !API_URL || !getAuthToken() || !cashGremios.length) {
       setCashLoading(false)
+      setCashSyncMessage('')
       return undefined
     }
     let active = true
     setCashLoading(true)
     setCashSyncMessage('')
-    Promise.all(gremios.map((gremio) => loadCashRegister(gremio)))
+    Promise.all(cashGremios.map((gremio) => loadCashRegister(gremio)))
       .catch((cause) => {
         if (active) setCashSyncMessage(cause instanceof Error
           ? `No se pudo cargar la caja compartida: ${cause.message}. Se conservó la copia local.`
@@ -194,7 +211,7 @@ export default function TenantRouter() {
       if (active) setCashSyncMessage(`Caja guardada en este dispositivo, pero falta sincronizarla: ${event.detail?.message ?? 'error de conexión'}`)
     }
     const onOnline = () => {
-      void Promise.all(gremios.map((gremio) => refreshCashRegister(gremio)))
+      void Promise.all(cashGremios.map((gremio) => refreshCashRegister(gremio)))
         .catch((cause) => {
           if (active) setCashSyncMessage(cause instanceof Error ? cause.message : 'No se pudo sincronizar la caja.')
         })
@@ -206,7 +223,7 @@ export default function TenantRouter() {
       window.removeEventListener('vexora:cash-register-sync-error', onSyncError)
       window.removeEventListener('online', onOnline)
     }
-  }, [gremioKey, tenant.isDemo])
+  }, [gremioKey, role, tenant.isDemo])
 
   useEffect(() => {
     if (path !== '/pos' || tenant.isDemo || !API_URL || !window.localStorage.getItem('vexora.accessToken')) {
@@ -224,7 +241,7 @@ export default function TenantRouter() {
   if (path === '/recuperar-contrasena') return <ForgotPassword />
   if (path === '/restablecer-contrasena') return <ResetPassword />
   if (role === 'COCINA' && path !== '/pos') {
-    return <main className="grid min-h-screen place-items-center bg-zinc-50 p-6"><section className="max-w-md rounded-2xl border bg-white p-6 text-center"><h1 className="text-xl font-black">Acceso de cocina</h1><p className="mt-2 text-sm text-zinc-600">Esta cuenta solo puede consultar y actualizar las comandas de comidas rápidas.</p><button type="button" onClick={logout} className="mt-5 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white">Cerrar sesión</button></section></main>
+    return <main className="grid min-h-screen place-items-center bg-zinc-50 p-6"><section className="max-w-md rounded-2xl border bg-white p-6 text-center"><h1 className="text-xl font-black">Acceso de cocina</h1><p className="mt-2 text-sm text-zinc-600">Esta cuenta solo puede consultar y actualizar las comandas del gremio que tiene asignado.</p><button type="button" onClick={logout} className="mt-5 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white">Cerrar sesión</button></section></main>
   }
   if (path === '/customer-display') {
     const url = new URL(window.location.href)
@@ -259,12 +276,16 @@ export default function TenantRouter() {
   if (path !== '/pos') return <LandingVexora />
   if (accessibleGremios.length === 0) {
     return role === 'COCINA'
-      ? <main className="grid min-h-screen place-items-center bg-zinc-50 p-6"><section className="max-w-md rounded-2xl border bg-white p-6 text-center"><h1 className="text-xl font-black">Gremio no asignado</h1><p className="mt-2 text-sm text-zinc-600">La cuenta de cocina debe ser asignada a Comidas rápidas por el propietario.</p><button type="button" onClick={logout} className="mt-5 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white">Cerrar sesión</button></section></main>
+      ? <main className="grid min-h-screen place-items-center bg-zinc-50 p-6"><section className="max-w-md rounded-2xl border bg-white p-6 text-center"><h1 className="text-xl font-black">Gremio no asignado</h1><p className="mt-2 text-sm text-zinc-600">La cuenta de cocina debe ser asignada a Restaurante o Comidas rápidas por el propietario.</p><button type="button" onClick={logout} className="mt-5 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white">Cerrar sesión</button></section></main>
       : <OnboardingGremios />
   }
 
   const effectiveGremio = accessibleGremios.includes(activeGremio) ? activeGremio : accessibleGremios[0]
-  const SelectedPOS = views[effectiveGremio] ?? views[accessibleGremios[0]]
+  const SelectedPOS = role === 'COCINA'
+    ? effectiveGremio === 'restaurante'
+      ? RestaurantKitchen
+      : QuickMealsKitchen
+    : views[effectiveGremio] ?? views[accessibleGremios[0]]
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-6"><a href="/" className="font-black tracking-tight">VEXORA <span className="text-vexora-600">POS</span></a><div className="flex flex-wrap items-center justify-end gap-3">{role !== 'COCINA' && <><a href="/billing" className="text-sm font-semibold text-vexora-700 hover:text-vexora-900">Plan y facturación</a>{canAdmin && <a href="/publicidad" className="text-sm font-semibold text-violet-700 hover:text-violet-900">Mi publicidad</a>}</>}<p className="hidden text-xs font-medium text-zinc-500 sm:block">{tenant.isDemo ? 'Espacio de negocio · Vista de demostración' : `Negocio · ${tenant.business?.name ?? tenant.business?.email ?? ''}`}</p>{tenant.user?.userCode && <p className="text-xs font-semibold text-zinc-700">Código de usuario: {tenant.user.userCode}</p>}<button type="button" onClick={logout} className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-3 py-2 text-sm font-bold text-zinc-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"><LogOut className="h-4 w-4" />{tenant.isDemo ? 'Cambiar a cuenta de pruebas' : 'Cerrar sesión'}</button></div></header>

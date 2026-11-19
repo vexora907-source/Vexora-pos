@@ -14,6 +14,7 @@ import { isDemoMode } from '../../shared/services/tenantStorage.js'
 import { EmptyInventoryState } from '../../shared/components/Inventory/EmptyInventoryState.jsx'
 import { formatCOP } from '../../shared/services/ticket.js'
 import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
+import { usePersistentCart } from '../../shared/hooks/usePersistentCart.js'
 
 const initialInventory = [
   { id: 'key-blank', name: 'Llaves en bruto', category: 'Insumos', price: 0, quantity: 40, icon: '🗝️' },
@@ -31,7 +32,7 @@ export default function CerrajeriaPOS() {
   const [receipt, setReceipt] = useState(null)
   const [message, setMessage] = useState('')
   const [inventoryOpen, setInventoryOpen] = useState(false)
-  const [cart, setCart] = useState([])
+  const [cart, setCart] = usePersistentCart('cerrajeria')
   const displayItems = cart.length ? cart : pendingOrder ? [{ name: pendingOrder.service, price: pendingOrder.price, quantity: 1 }] : EMPTY_DISPLAY_ITEMS
   const displayTotal = displayItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   useCustomerDisplay({ gremio: 'cerrajeria', items: displayItems, total: displayTotal })

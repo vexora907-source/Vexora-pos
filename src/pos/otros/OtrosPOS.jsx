@@ -10,13 +10,14 @@ import { InventoryManager } from '../../shared/components/Inventory/InventoryMan
 import { EmptyInventoryState } from '../../shared/components/Inventory/EmptyInventoryState.jsx'
 import { assertCashRegisterOpen, recordCashSale } from '../../shared/services/cashRegister.js'
 import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
+import { usePersistentCart } from '../../shared/hooks/usePersistentCart.js'
 
 export default function OtrosPOS() {
   const { dian, business, customGremioName } = useTenantGremio()
   const gremioName = customGremioName?.trim() || 'Otros'
   const { products, allProducts, addProduct, importProducts, adjustStock, updateProduct, deleteProduct, loadSampleInventory, validateSale, recordSale, loading, error, remote } = useInventory('otros', [])
   const [query, setQuery] = useState('')
-  const [cart, setCart] = useState([])
+  const [cart, setCart] = usePersistentCart('otros')
   const [notice, setNotice] = useState('')
   const [receipt, setReceipt] = useState(null)
   const [inventoryOpen, setInventoryOpen] = useState(false)
@@ -66,6 +67,7 @@ export default function OtrosPOS() {
       const sale = await recordSale(cart, paymentMethod)
       recordCashSale('otros', total, paymentMethod)
       setReceipt({ items: cart, paymentMethod, sale, cashReceived: cashDetails?.cashReceived, changeDue: cashDetails?.changeDue })
+      setCart([])
       setNotice('')
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'No se pudo registrar la venta.')

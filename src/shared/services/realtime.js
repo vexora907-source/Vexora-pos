@@ -6,8 +6,10 @@ import { API_URL } from './api.js'
 export function connectRealtimeSocket() {
   const token = getAuthToken()
   if (isDemoMode() || !token || !API_URL) return null
-  return io(API_URL, {
+  const socketUrl = new URL(API_URL)
+  return io(socketUrl.origin, {
     auth: { token },
+    transports: ['websocket'],
     reconnection: true,
     reconnectionAttempts: Infinity,
     timeout: 10000,

@@ -49,6 +49,7 @@ export default function CustomerDisplay({ gremio, sourceId }) {
   useEffect(() => {
     if (!configState.enabled || isDemoMode()) return undefined
     let active = true
+    setAds([])
     const loadAds = async () => {
       try {
         const result = await apiRequest('/api/publicidad/feed')
@@ -66,7 +67,7 @@ export default function CustomerDisplay({ gremio, sourceId }) {
       active = false
       window.clearInterval(intervalId)
     }
-  }, [configState.enabled])
+  }, [configState.enabled, gremio])
 
   useEffect(() => {
     const onSessionChange = (event) => {
@@ -126,7 +127,7 @@ export default function CustomerDisplay({ gremio, sourceId }) {
     </main>
   }
 
-  return <main className="min-h-screen bg-slate-950 px-5 py-8 text-white sm:px-10 sm:py-12">
+  return <main className="min-h-screen bg-slate-950 px-5 pb-40 pt-8 text-white sm:px-10 sm:pb-44 sm:pt-12">
     <div className="mx-auto max-w-5xl">
       <header className="flex items-center gap-4 border-b border-white/15 pb-6">
         <ShoppingBag className="h-9 w-9 text-violet-300" />
@@ -138,11 +139,13 @@ export default function CustomerDisplay({ gremio, sourceId }) {
           <p className="shrink-0 text-lg font-black tabular-nums sm:text-2xl">{formatCOP(item.total)}</p>
         </article>)}
       </section>
-      <footer className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-white/20 pt-6">
-        <div>{sale.paymentMethod && <p className="text-sm text-slate-300">Pago: <span className="font-bold text-white">{sale.paymentMethod}</span></p>}
-          {isReceipt && <p className="mt-2 text-sm text-violet-200">¡Gracias por tu compra!</p>}
+      <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-white/20 bg-slate-950/95 px-5 py-4 text-white shadow-[0_-12px_30px_rgba(2,6,23,0.45)] backdrop-blur sm:px-10 sm:py-5">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-end justify-between gap-4">
+          <div>{sale.paymentMethod && <p className="text-sm text-slate-300">Pago: <span className="font-bold text-white">{sale.paymentMethod}</span></p>}
+            {isReceipt && <p className="mt-2 text-sm text-violet-200">¡Gracias por tu compra!</p>}
+          </div>
+          <p className="ml-auto text-right"><span className="block text-xs font-bold uppercase tracking-widest text-slate-300">Total</span><span className="text-4xl font-black tabular-nums sm:text-5xl">{formatCOP(sale.total)}</span></p>
         </div>
-        <p className="text-right"><span className="block text-xs font-bold uppercase tracking-widest text-slate-300">Total</span><span className="text-4xl font-black tabular-nums sm:text-5xl">{formatCOP(sale.total)}</span></p>
       </footer>
     </div>
   </main>

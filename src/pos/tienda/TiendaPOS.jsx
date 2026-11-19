@@ -13,6 +13,7 @@ import { assertCashRegisterOpen, recordCashSale } from '../../shared/services/ca
 import { appStorage, isDemoMode } from '../../shared/services/tenantStorage.js'
 import { API_URL } from '../../shared/services/api.js'
 import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
+import { usePersistentCart } from '../../shared/hooks/usePersistentCart.js'
 
 const initialProducts = [
   { id: 'arroz', barcode: '7701000000103', name: 'Arroz por libra', category: 'Granos', price: 2400, quantity: 38, icon: '🍚', unit: 'lb' },
@@ -123,7 +124,7 @@ export default function TiendaPOS() {
   const [supplierMessage, setSupplierMessage] = useState('')
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Todos')
-  const [cart, setCart] = useState([])
+  const [cart, setCart] = usePersistentCart('tienda')
   const [tab, setTab] = useState('venta')
   const [notice, setNotice] = useState('')
   const [inventoryOpen, setInventoryOpen] = useState(false)
@@ -250,6 +251,7 @@ export default function TiendaPOS() {
       if (onCredit && !authenticatedApi) sale = await recordSale(cart)
       recordCashSale('tienda', total, onCredit ? 'fiado' : method)
       setReceipt({ items: cart, paymentMethod: onCredit ? 'Fiado' : method, sale, cashReceived: onCredit ? undefined : cashDetails.cashReceived, changeDue: onCredit ? undefined : cashDetails.changeDue })
+      setCart([])
       setNotice(onCredit ? `Fiado registrado a nombre de ${creditName.trim()}.` : '')
     } catch (cause) {
       if (authenticatedApi) setApiError(cause instanceof Error ? cause.message : 'No se pudo registrar la venta.')

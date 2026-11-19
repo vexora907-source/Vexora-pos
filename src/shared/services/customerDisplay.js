@@ -2,11 +2,41 @@ const CHANNEL_PREFIX = 'vexora.customer-display.v1'
 const RECEIPT_DISPLAY_MS = 45_000
 const channels = new Map()
 const latestStates = new Map()
-const sessionId = globalThis.crypto?.randomUUID?.() ?? `display-${Date.now()}-${Math.random().toString(36).slice(2)}`
+const SESSION_ID_KEY = 'vexora.customer-display.session.v1'
+
+function createSessionId() {
+  return globalThis.crypto?.randomUUID?.() ?? `display-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+export function getOrCreateCustomerDisplaySessionId(storage) {
+  try {
+    const existing = storage.getItem(SESSION_ID_KEY)
+    if (existing) return existing
+    const next = createSessionId()
+    storage.setItem(SESSION_ID_KEY, next)
+    return next
+  } catch (error) {
+    console.error('No se pudo conservar la sesión de la pantalla del cliente.', error)
+    return createSessionId()
+  }
+}
+
+function getSessionId() {
+  if (typeof window === 'undefined') return createSessionId()
+  try {
+    return getOrCreateCustomerDisplaySessionId(window.sessionStorage)
+  } catch (error) {
+    console.error('No se pudo conservar la sesión de la pantalla del cliente.', error)
+    return createSessionId()
+  }
+}
+
+const sessionId = getSessionId()
 
 export function getCustomerDisplayTenantKey(tenant) {
   const business = tenant?.business ?? {}
-  const identity = business.id ?? business._id ?? business.email ?? tenant?.email ?? business.name
+  const identity = business.id ?? business._id ?? tenant?.id ?? tenant?._id
+    ?? business.email ?? tenant?.email ?? tenant?.dian?.nit ?? business.name
   return identity ? encodeURIComponent(String(identity).trim().toLowerCase()) : 'unknown'
 }
 

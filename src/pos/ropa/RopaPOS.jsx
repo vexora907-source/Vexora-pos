@@ -14,6 +14,7 @@ import { appStorage, isDemoMode } from '../../shared/services/tenantStorage.js'
 import { formatCOP } from '../../shared/services/ticket.js'
 import { API_URL } from '../../shared/services/api.js'
 import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
+import { usePersistentCart } from '../../shared/hooks/usePersistentCart.js'
 
 const initialProducts = [
   {
@@ -137,7 +138,7 @@ export default function RopaPOS() {
   const [category, setCategory] = useState('Todo')
   const [selectedVariants, setSelectedVariants] = useState({})
   const [variantRestock, setVariantRestock] = useState({})
-  const [cart, setCart] = useState([])
+  const [cart, setCart] = usePersistentCart('ropa')
   const [paymentMethod, setPaymentMethod] = useState('')
   const [ticket, setTicket] = useState(null)
   const [ticketSale, setTicketSale] = useState(null)
@@ -293,6 +294,7 @@ export default function RopaPOS() {
       setPaymentMethod(method)
       setTicket(cart.map((item) => ({ ...item, name: `${item.name} · ${item.variant.size} · ${item.variant.color}` })))
       setTicketSale({ ...sale, cashReceived: cashDetails?.cashReceived, changeDue: cashDetails?.changeDue })
+      setCart([])
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo registrar la venta.')
     }

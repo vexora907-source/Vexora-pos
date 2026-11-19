@@ -10,6 +10,7 @@ import { InventoryManager } from '../../shared/components/Inventory/InventoryMan
 import { EmptyInventoryState } from '../../shared/components/Inventory/EmptyInventoryState.jsx'
 import { assertCashRegisterOpen, recordCashSale } from '../../shared/services/cashRegister.js'
 import { useCustomerDisplay } from '../../shared/hooks/useCustomerDisplay.js'
+import { usePersistentCart } from '../../shared/hooks/usePersistentCart.js'
 
 const initialStock = [
   { id: 'drill', name: 'Taladro percutor', category: 'Herramientas', price: 189000, quantity: 8, icon: '🛠️' },
@@ -24,7 +25,7 @@ export default function FerreteriaPOS() {
   const { dian, business } = useTenantGremio()
   const { products: stock, allProducts, addProduct, importProducts, adjustStock, updateProduct, deleteProduct, loadSampleInventory, validateSale, recordSale, loading: inventoryLoading, error: inventoryError, remote: inventoryRemote } = useInventory('ferreteria', initialStock)
   const [query, setQuery] = useState('')
-  const [cart, setCart] = useState([])
+  const [cart, setCart] = usePersistentCart('ferreteria')
   const [notice, setNotice] = useState('')
   const [receipt, setReceipt] = useState(null)
   const [inventoryOpen, setInventoryOpen] = useState(false)
@@ -70,6 +71,7 @@ export default function FerreteriaPOS() {
       const sale = await recordSale(cart, paymentMethod)
       recordCashSale('ferreteria', total, paymentMethod)
       setReceipt({ items: cart, paymentMethod, sale, cashReceived: cashDetails?.cashReceived, changeDue: cashDetails?.changeDue })
+      setCart([])
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'No se pudo registrar la venta.')
     }

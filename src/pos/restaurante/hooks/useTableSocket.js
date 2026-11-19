@@ -68,5 +68,5 @@ export function useTableSocket(gremio = 'restaurant') {
     }
   }, [key])
 
-  return { floors: data.floors, tables: data.tables, designed: data.designed, updateData }
+  return { floors: data.floors, tables: data.tables, designed: data.designed, updateData, storageKey: key }
 }

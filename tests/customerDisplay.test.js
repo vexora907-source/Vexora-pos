@@ -1,6 +1,22 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getCustomerDisplayTenantKey, normalizeCustomerDisplayState } from '../src/shared/services/customerDisplay.js'
+import {
+  getCustomerDisplayTenantKey,
+  getOrCreateCustomerDisplaySessionId,
+  normalizeCustomerDisplayState,
+} from '../src/shared/services/customerDisplay.js'
+
+class MemoryStorage {
+  values = new Map()
+
+  getItem(key) {
+    return this.values.get(key) ?? null
+  }
+
+  setItem(key, value) {
+    this.values.set(key, String(value))
+  }
+}
 
 test('normalizes purchase lines for the customer screen without exposing extra product data', () => {
   const state = normalizeCustomerDisplayState({
@@ -49,4 +65,10 @@ test('isolates customer display channels by business identity', () => {
     getCustomerDisplayTenantKey({ business: { email: 'uno@ejemplo.com' } }),
     getCustomerDisplayTenantKey({ business: { email: 'dos@ejemplo.com' } }),
   )
+})
+
+test('preserves the customer display source id across reloads in the same tab', () => {
+  const storage = new MemoryStorage()
+
+  assert.equal(getOrCreateCustomerDisplaySessionId(storage), getOrCreateCustomerDisplaySessionId(storage))
 })
