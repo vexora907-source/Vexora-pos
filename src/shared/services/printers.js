@@ -343,6 +343,28 @@ export async function printConfiguredUsbTicket(gremio, target, ticket) {
   return true
 }
 
+export async function printKitchenTicket(gremio, ticket) {
+  const printers = await getPrinterConfig(gremio)
+  const printer = printers?.cocina
+  if (!printer) throw new Error('Configura la impresora de cocina antes de imprimir la comanda.')
+  const printableTicket = await preparePrintableTicket(gremio, 'cocina', ticket)
+  if (printer.tipo === 'usb') {
+    await printUsb(printableTicket, 'cocina', true)
+    return
+  }
+  if (printer.tipo !== 'red') throw new Error('El tipo de impresora de cocina no es válido.')
+  if (isDemoMode()) throw new Error('La demo no se conecta a impresoras de red ni al backend.')
+  const { codeImage: _codeImage, negocio, ...networkTicket } = printableTicket
+  const { logoPrintImage: _logoPrintImage, ...networkBusiness } = negocio ?? {}
+  await apiRequest(`/api/printers/${encodeURIComponent(gremio)}/print/cocina`, {
+    method: 'POST',
+    body: JSON.stringify({
+      ticket: { ...networkTicket, ...(negocio ? { negocio: networkBusiness } : {}) },
+      automatic: false,
+    }),
+  })
+}
+
 export async function printConfiguredTicket(gremio, target, ticket) {
   const printers = await getPrinterConfig(gremio)
   const printer = printers?.[target]

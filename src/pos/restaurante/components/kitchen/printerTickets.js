@@ -1,9 +1,25 @@
+import { kitchenItemName } from './kitchenOrderAdapters.js'
+
 export function ticketForPrinter(order) {
   return {
     numero: order._id,
     mesa: order.tableName,
     productos: order.items.map((item) => ({
-      nombre: item.name,
+      nombre: kitchenItemName(item),
+      cantidad: item.quantity,
+      nota: item.note,
+    })),
+  }
+}
+
+export function kitchenTicketForTable(table) {
+  const pending = table.items.filter((item) => item.sentAt && !item.readyAt)
+  return {
+    numero: table.id,
+    mesa: table.name,
+    fecha: pending[0]?.sentAt ? new Date(pending[0].sentAt).toLocaleString('es-CO') : undefined,
+    productos: pending.map((item) => ({
+      nombre: kitchenItemName(item),
       cantidad: item.quantity,
       nota: item.note,
     })),

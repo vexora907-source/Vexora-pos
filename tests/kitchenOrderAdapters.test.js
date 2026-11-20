@@ -29,6 +29,21 @@ test('maps active quick-meal orders to the shared kitchen display and hides comp
   assert.equal(mapQuickMealOrders([{ status: 'DELIVERED', items: [] }]).length, 0)
 })
 
+test('keeps product names visible when the API uses an alternate product field', () => {
+  const [order] = mapQuickMealOrders([{
+    _id: 'order-123456',
+    type: 'takeaway',
+    status: 'RECEIVED',
+    items: [
+      { productId: 'burger', productName: 'Hamburguesa', quantity: 1 },
+      { productId: 'fries', product: { nombre: 'Papas' }, quantity: 1 },
+      { productId: 'drink', quantity: 1 },
+    ],
+  }])
+
+  assert.deepEqual(order.items.map((item) => item.name), ['Hamburguesa', 'Papas', 'drink'])
+})
+
 test('builds kitchen and ready tickets with the order items and location', () => {
   const order = {
     _id: 'order-123456',

@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ChefHat, Clock3 } from 'lucide-react'
 import { apiRequest } from '../../../../shared/services/api.js'
 import { connectRealtimeSocket } from '../../../../shared/services/realtime.js'
-import { printConfiguredUsbTicket } from '../../../../shared/services/printers.js'
-import { readyTicketForPrinter, ticketForPrinter } from './printerTickets.js'
+import { printConfiguredUsbTicket, printKitchenTicket } from '../../../../shared/services/printers.js'
+import { kitchenTicketForTable, readyTicketForPrinter, ticketForPrinter } from './printerTickets.js'
 import {
+  kitchenItemName,
   mapQuickMealOrders,
   quickMealKitchenTicket,
   quickMealReadyTicket,
@@ -21,6 +22,7 @@ function mapKitchenOrders(orders) {
     }
     table.items.push(...order.items.map((item) => ({
       ...item,
+      name: kitchenItemName(item),
       id: item.productId,
       sentAt: item.sentAt ?? order.createdAt,
     })))
@@ -44,6 +46,15 @@ export function KDS({ tables, onBump, onBack, remote = false, gremio = 'restaura
   )
   const active = visibleTables.filter((table) => table.items.some((item) => item.sentAt && !item.readyAt))
   const waitingItems = active.reduce((sum, table) => sum + table.items.filter((item) => item.sentAt && !item.readyAt).length, 0)
+
+  async function printTable(table) {
+    try {
+      await printKitchenTicket(gremio, kitchenTicketForTable(table))
+      setError('')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo imprimir la comanda de cocina.')
+    }
+  }
 
   useEffect(() => {
     if (!remote) return undefined
@@ -168,7 +179,7 @@ export function KDS({ tables, onBump, onBack, remote = false, gremio = 'restaura
         <div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-bold"><Clock3 className="h-4 w-4 text-amber-400" />{waitingItems} plato(s) pendientes</span>{onBack && <button type="button" onClick={onBack} className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-black text-zinc-950 hover:bg-amber-400"><ArrowLeft className="h-4 w-4" />Volver a mesas</button>}</div>
       </header>
       {error && <p role="alert" className="mx-auto mt-4 max-w-3xl rounded-xl bg-rose-950 px-4 py-3 text-sm text-rose-100">{error}</p>}
-      {active.length ? <div className="mx-auto mt-6 grid max-w-[1600px] gap-4 sm:grid-cols-2 xl:grid-cols-4">{active.map((table) => <TicketKitchen key={table.id} table={table} onBump={bump} />)}</div> : <div className="mx-auto mt-20 max-w-lg text-center"><div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-400"><ChefHat className="h-8 w-8" /></div><h2 className="mt-5 text-2xl font-black">Cocina al día</h2><p className="mt-2 text-zinc-400">Las nuevas comandas aparecerán aquí al enviarlas desde una mesa.</p></div>}
+      {active.length ? <div className="mx-auto mt-6 grid max-w-[1600px] gap-4 sm:grid-cols-2 xl:grid-cols-4">{active.map((table) => <TicketKitchen key={table.id} table={table} onBump={bump} onPrint={printTable} />)}</div> : <div className="mx-auto mt-20 max-w-lg text-center"><div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-400"><ChefHat className="h-8 w-8" /></div><h2 className="mt-5 text-2xl font-black">Cocina al día</h2><p className="mt-2 text-zinc-400">Las nuevas comandas aparecerán aquí al enviarlas desde una mesa.</p></div>}
     </main>
   )
 }
