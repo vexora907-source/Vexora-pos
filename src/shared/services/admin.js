@@ -65,6 +65,18 @@ export function getAdminLicenses() {
   return apiRequest('/api/admin/licenses')
 }
 
+export function previewKitchenUserTransfer(userCode, targetTenantId) {
+  const params = new URLSearchParams({ targetTenantId })
+  return apiRequest(`/api/admin/users/kitchen-transfer-preview/${encodeURIComponent(userCode)}?${params}`)
+}
+
+export function transferKitchenUser(input) {
+  return apiRequest('/api/admin/users/kitchen-transfer', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
 export function assignTenantGremios(tenantId, gremios) {
   return apiRequest(`/api/admin/tenants/${encodeURIComponent(tenantId)}/gremios`, {
     method: 'PUT',

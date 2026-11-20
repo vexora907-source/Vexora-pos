@@ -4,7 +4,7 @@ import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { assignTenantGremios, createAdminUser, createBranch, createExpense, getAccountingReport, getAdminActivity, getAdminLicenses, getAdminUsers, getInventoryReport, getSalesReport, updateAdminUser } from '../../shared/services/admin.js'
+import { assignTenantGremios, createAdminUser, createBranch, createExpense, getAccountingReport, getAdminActivity, getAdminLicenses, getAdminUsers, getInventoryReport, getSalesReport, previewKitchenUserTransfer, transferKitchenUser, updateAdminUser } from '../../shared/services/admin.js'
 import { adminPlanHasFeature, canonicalAdminPlan, FEATURE_PLANS } from '../../shared/services/adminPlanFeatures.js'
 import { CashRegister } from '../../shared/components/CashRegister/CashRegister.jsx'
 import { fetchLicenseSummary } from '../../shared/services/licenseService.js'
@@ -262,6 +262,11 @@ export default function Admin() {
     setNotice('Usuario actualizado.')
   }
 
+  async function moveKitchenUser(targetTenantId, input) {
+    const result = await transferKitchenUser({ ...input, targetTenantId })
+    setNotice(`Cuenta Cocina ${result.transfer.userCode} transferida a ${result.transfer.targetTenant}. Sus sesiones anteriores se cerraron.`)
+  }
+
   async function reprintSale(sale) {
     if (!sale.gremio || !Array.isArray(sale.items) || sale.items.length === 0) {
       setError('Esta venta no tiene artículos guardados para imprimir una copia.')
@@ -506,22 +511,84 @@ export default function Admin() {
 
     {tab === 'activity' && <section className="mt-5 overflow-x-auto rounded-2xl border bg-white"><table className="w-full min-w-[600px] text-left text-sm"><thead className="bg-zinc-100 text-xs uppercase text-zinc-500"><tr><th className="p-3">Fecha y hora</th><th className="p-3">Usuario</th><th className="p-3">Actividad</th><th className="p-3">Detalle</th></tr></thead><tbody>{activity.map((entry) => <tr key={entry._id} className="border-t"><td className="p-3">{new Date(entry.createdAt).toLocaleString('es-CO')}</td><td className="p-3">{entry.actorName}</td><td className="p-3">{entry.action}</td><td className="p-3">{entry.detail}</td></tr>)}{!activity.length && <tr><td colSpan="4" className="p-8 text-center text-zinc-500">Aún no hay actividad registrada.</td></tr>}</tbody></table></section>}
 
-    {tab === 'licenses' && isSuperAdmin && <section className="mt-5 space-y-4">{licenses.map((license) => <LicenseRow key={license._id} license={license} onSave={updateTenantGremios} />)}{!licenses.length && <p className="rounded-xl border bg-white p-6 text-zinc-500">No hay licencias registradas.</p>}</section>}
+    {tab === 'licenses' && isSuperAdmin && <section className="mt-5 space-y-4">{licenses.map((license) => <LicenseRow key={license._id} license={license} onSave={updateTenantGremios} onTransfer={moveKitchenUser} />)}{!licenses.length && <p className="rounded-xl border bg-white p-6 text-zinc-500">No hay licencias registradas.</p>}</section>}
     </section>
   </div></main>
 }
 
-function LicenseRow({ license, onSave }) {
+function LicenseRow({ license, onSave, onTransfer }) {
   const [selected, setSelected] = useState(license.tenant?.gremios ?? [])
+  const [userCode, setUserCode] = useState('')
+  const [gremio, setGremio] = useState('')
+  const [sucursal, setSucursal] = useState('')
+  const [transferPreview, setTransferPreview] = useState(null)
+  const [transferError, setTransferError] = useState('')
+  const [transferBusy, setTransferBusy] = useState(false)
   const tenant = license.tenant
   if (!tenant) return null
   function toggle(id) {
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : current.length < 3 ? [...current, id] : current)
+  }
+  const kitchenGremios = (tenant.gremios ?? []).filter((id) => ['restaurante', 'comidas_rapidas'].includes(id))
+  const kitchenBranches = (tenant.sucursales ?? []).filter((branch) => branch.gremio === gremio)
+  async function reviewKitchenUser(event) {
+    event.preventDefault()
+    setTransferError('')
+    setTransferPreview(null)
+    setTransferBusy(true)
+    try {
+      const result = await previewKitchenUserTransfer(userCode, tenant._id)
+      setTransferPreview(result)
+      const nextGremio = kitchenGremios.includes(gremio) ? gremio : kitchenGremios[0] ?? ''
+      setGremio(nextGremio)
+      setSucursal((tenant.sucursales ?? []).find((branch) => branch.gremio === nextGremio)?.id ?? '')
+    } catch (cause) {
+      setTransferError(cause instanceof Error ? cause.message : 'No se pudo revisar la cuenta Cocina.')
+    } finally {
+      setTransferBusy(false)
+    }
+  }
+  async function confirmKitchenUserTransfer() {
+    if (!transferPreview || !gremio || !sucursal) return
+    setTransferError('')
+    setTransferBusy(true)
+    try {
+      await onTransfer(tenant._id, {
+        userCode,
+        sourceTenantId: transferPreview.sourceTenant.id,
+        gremio,
+        sucursal,
+      })
+      setUserCode('')
+      setTransferPreview(null)
+    } catch (cause) {
+      setTransferError(cause instanceof Error ? cause.message : 'No se pudo transferir la cuenta Cocina.')
+    } finally {
+      setTransferBusy(false)
+    }
   }
   const tenantGremioLabels = { ...gremioLabels, otros: tenant.customGremioName || 'Otros' }
   return <article className="rounded-2xl border bg-white p-5">
     <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-black">{tenant.name}</h2><p className="text-sm text-zinc-500">{tenant.email} · {license.plan} · {license.status}</p></div><p className="text-xs text-zinc-500">Vence: {license.validUntil ? new Date(license.validUntil).toLocaleDateString('es-CO') : 'sin vigencia'}</p></header>
     <fieldset className="mt-4"><legend className="text-sm font-bold">Gremios asignados (máximo 3)</legend><div className="mt-2 flex flex-wrap gap-2">{allGremios.map((id) => <label key={id} className="rounded-lg border px-3 py-2 text-sm"><input type="checkbox" checked={selected.includes(id)} disabled={!selected.includes(id) && selected.length >= 3} onChange={() => toggle(id)} /> <span className="ml-1">{tenantGremioLabels[id]}</span></label>)}</div></fieldset>
     <button type="button" disabled={!selected.length} onClick={() => onSave(license, selected)} className="mt-4 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">Guardar asignación</button>
+    <form onSubmit={reviewKitchenUser} className="mt-5 space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <h3 className="font-bold">Corregir cuenta Cocina de otro negocio</h3>
+      <p className="text-xs text-zinc-700">Traslada una cuenta Cocina activa a este negocio. Se cerrarán sus sesiones anteriores y quedará vinculada a un gremio y sucursal de destino. Confirma la autorización de ambos negocios antes de continuar.</p>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-xs font-semibold">Código de usuario<input required pattern="\d{6}" maxLength="6" inputMode="numeric" value={userCode} onChange={(event) => { setUserCode(event.target.value); setTransferPreview(null) }} placeholder="000005" className="mt-1 block rounded-lg border bg-white p-2.5" /></label>
+        <label className="text-xs font-semibold">Gremio<select required value={gremio} onChange={(event) => { setGremio(event.target.value); setSucursal((tenant.sucursales ?? []).find((branch) => branch.gremio === event.target.value)?.id ?? '') }} className="mt-1 block rounded-lg border bg-white p-2.5">{kitchenGremios.map((id) => <option key={id} value={id}>{gremioLabels[id]}</option>)}</select></label>
+        <label className="text-xs font-semibold">Sucursal<select required value={sucursal} onChange={(event) => setSucursal(event.target.value)} className="mt-1 block rounded-lg border bg-white p-2.5">{kitchenBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
+        <button type="submit" disabled={transferBusy || !kitchenGremios.length} className="rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-xs font-bold disabled:opacity-50">{transferBusy ? 'Revisando…' : 'Revisar cuenta'}</button>
+      </div>
+      {transferPreview && <div className="space-y-2 rounded-lg border border-amber-300 bg-white p-3 text-sm">
+        <p>Cuenta: <strong>{transferPreview.user.name} · {transferPreview.user.userCode}</strong></p>
+        <p>Origen: <strong>{transferPreview.sourceTenant.name}</strong> → Destino: <strong>{transferPreview.targetTenant.name}</strong></p>
+        <p className="text-xs text-rose-800">La transferencia invalida las sesiones existentes. Los datos históricos del negocio de origen no se trasladan.</p>
+        <button type="button" disabled={transferBusy || !gremio || !sucursal} onClick={confirmKitchenUserTransfer} className="rounded-lg bg-rose-700 px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50">{transferBusy ? 'Transfiriendo…' : 'Confirmar transferencia autorizada'}</button>
+      </div>}
+      {transferError && <p role="alert" className="text-sm text-rose-700">{transferError}</p>}
+      {!kitchenGremios.length && <p className="text-xs text-zinc-600">Este negocio no tiene Restaurante ni Comidas rápidas asignado.</p>}
+    </form>
   </article>
 }
