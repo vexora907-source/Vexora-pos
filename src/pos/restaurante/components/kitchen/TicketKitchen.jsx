@@ -3,10 +3,11 @@ import { useState } from 'react'
 import { formatCOP } from '../../../../shared/services/ticket.js'
 import { useKitchenTimer, formatElapsed } from '../../hooks/useKitchenTimer.js'
 import { KDSBump } from './KDSBump.jsx'
+import { isKitchenItemPending } from './kitchenOrderAdapters.js'
 
-export function TicketKitchen({ table, onBump, onPrint }) {
+export function TicketKitchen({ table, onBump, onPrint, remote = false }) {
   const [printing, setPrinting] = useState(false)
-  const pending = table.items.filter((item) => item.sentAt && !item.readyAt)
+  const pending = table.items.filter((item) => isKitchenItemPending(item, remote))
   const start = pending.reduce((oldest, item) => !oldest || new Date(item.sentAt) < new Date(oldest) ? item.sentAt : oldest, null)
   const seconds = useKitchenTimer(start)
   const urgent = seconds >= 15 * 60

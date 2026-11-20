@@ -1,4 +1,4 @@
-import { kitchenItemName } from './kitchenOrderAdapters.js'
+import { isKitchenItemPending, kitchenItemName } from './kitchenOrderAdapters.js'
 
 export function ticketForPrinter(order) {
   return {
@@ -12,8 +12,8 @@ export function ticketForPrinter(order) {
   }
 }
 
-export function kitchenTicketForTable(table) {
-  const pending = table.items.filter((item) => item.sentAt && !item.readyAt)
+export function kitchenTicketForTable(table, remote = false) {
+  const pending = table.items.filter((item) => isKitchenItemPending(item, remote))
   return {
     numero: table.id,
     mesa: table.name,

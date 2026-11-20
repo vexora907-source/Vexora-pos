@@ -10,6 +10,10 @@ export function kitchenItemName(item) {
   return name?.trim() ?? 'Producto sin nombre'
 }
 
+export function isKitchenItemPending(item, remote = false) {
+  return !item.readyAt && (remote || Boolean(item.sentAt))
+}
+
 export function mapQuickMealOrders(orders) {
   return orders
     .filter((order) => ['RECEIVED', 'IN_KITCHEN'].includes(order.status))

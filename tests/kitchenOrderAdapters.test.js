@@ -1,10 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  isKitchenItemPending,
   mapQuickMealOrders,
   quickMealKitchenTicket,
   quickMealReadyTicket,
 } from '../src/pos/restaurante/components/kitchen/kitchenOrderAdapters.js'
+
+test('uses server readiness for remote kitchen items without sent timestamps', () => {
+  assert.equal(isKitchenItemPending({ readyAt: null }, true), true)
+  assert.equal(isKitchenItemPending({ sentAt: null, readyAt: null }, true), true)
+  assert.equal(isKitchenItemPending({ sentAt: null, readyAt: null }), false)
+  assert.equal(isKitchenItemPending({ sentAt: '2026-11-19T10:00:00.000Z', readyAt: '2026-11-19T10:01:00.000Z' }, true), false)
+})
 
 test('maps active quick-meal orders to the shared kitchen display and hides completed orders', () => {
   const [tableOrder, takeawayOrder] = mapQuickMealOrders([
